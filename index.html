@@ -1,0 +1,215 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Summit</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="vignette"></div>
+<div id="screen-flash"></div>
+<div id="letterbox"><i></i><i></i></div>
+
+<div id="hud" class="hidden">
+    <div class="hud-panel hud-vitals">
+        <div id="hud-hearts" aria-label="Vida"></div>
+        <div class="hud-energy">
+            <div id="hud-dashes" aria-label="Dashes"></div>
+            <div class="bar" aria-label="Fôlego"><div id="stamina"></div></div>
+        </div>
+    </div>
+    <div class="hud-panel hud-info">
+        <div id="hud-level"></div>
+        <div class="hud-row">
+            <span id="hud-berries"></span>
+            <span id="hud-deaths"></span>
+            <span id="hud-time">00:00.0</span>
+        </div>
+        <div id="hud-skills"></div>
+    </div>
+</div>
+
+<div id="hud-abilities" class="hidden" aria-label="Habilidades equipadas"></div>
+
+<div id="boss-bar" class="hidden">
+    <div id="boss-name"></div>
+    <div class="boss-track"><div id="boss-lag"></div><div id="boss-fill"></div><div id="boss-marks"></div></div>
+</div>
+<div id="banner" class="hidden"><small id="banner-kicker"></small><b id="banner-title"></b><span id="banner-sub"></span></div>
+<div id="checkpoint-note" class="hidden">Checkpoint</div>
+<div id="toasts"></div>
+
+<div id="menu" class="screen menu-cinematic">
+    <div class="menu-top">
+        <h1 class="logo">SUMMIT</h1>
+        <p class="tagline">Uma jornada em três capítulos</p>
+    </div>
+    <div class="menu-bottom">
+        <div class="menu-options">
+            <button data-act="continue">Continuar</button>
+            <button data-act="newgame">Novo Jogo</button>
+            <button data-act="options">Opções</button>
+        </div>
+    </div>
+    <div class="menu-version">v2.0</div>
+</div>
+
+<div id="saves" class="screen hidden">
+    <h2 id="saves-title">Saves</h2>
+    <div id="save-list"></div>
+    <button class="btn" data-act="back">Voltar</button>
+</div>
+
+<div id="mode" class="screen hidden">
+    <h2>Novo Save</h2>
+    <p>Escolha o modo de jogo. Essa escolha é permanente.</p>
+    <div class="mode-cards">
+        <button class="mode-card" data-act="mode-normal"><b>Modo Normal</b><span>Morra, volte ao checkpoint e tente de novo.</span></button>
+        <button class="mode-card danger" data-act="mode-permadeath"><b>Modo Morte Súbita</b><span>Uma única vida. Ao morrer, o save é apagado para sempre.</span></button>
+    </div>
+    <button data-act="back">Voltar</button>
+</div>
+
+<div id="credits" class="screen hidden">
+    <h2>Créditos</h2>
+    <p>Summit — uma jornada em três capítulos.</p>
+    <p class="tip">Modelos, música e efeitos sonoros gerados por código. Motor gráfico: three.js (licença MIT).</p>
+    <button data-act="back">Voltar</button>
+</div>
+
+<div id="death" class="screen hidden">
+    <h2 id="death-title">Morte Súbita</h2>
+    <p id="death-msg"></p>
+    <div id="death-stats" class="stat-row"></div>
+    <div class="buttons">
+        <button data-act="menu">Menu</button>
+    </div>
+</div>
+
+<div id="pause" class="screen hidden">
+    <h2>Pausado</h2>
+    <div id="pause-info" class="stat-row"></div>
+    <div class="buttons">
+        <button data-act="resume">Continuar</button>
+        <button data-act="restart">Reiniciar fase</button>
+        <button data-act="options">Opções</button>
+        <button data-act="to-hub">Voltar à central</button>
+    </div>
+</div>
+
+<div id="complete" class="screen hidden">
+    <small id="complete-kicker"></small>
+    <h2 id="complete-title">Fase completa!</h2>
+    <div id="complete-stats" class="stat-row"></div>
+    <div id="complete-unlocks" class="hidden"></div>
+    <div class="buttons">
+        <button data-act="next" id="btn-next">Próxima fase</button>
+        <button data-act="replay">Jogar de novo</button>
+        <button data-act="to-hub">Voltar à central</button>
+    </div>
+</div>
+
+<div id="hub" class="screen hidden" data-chapter="1">
+    <svg class="hub-backdrop" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMax slice" aria-hidden="true">
+        <path class="ridge ridge-far" d="M0 620 170 470l120 90 190-210 150 150 130-90 210 190 180-260 200 210 130-110 120 90v360H0z"/>
+        <path class="ridge ridge-mid" d="M0 720 210 590l150 90 170-150 210 170 180-120 170 130 230-190 280 200v180H0z"/>
+        <path class="ridge ridge-near" d="M0 820 240 730l210 70 260-110 240 110 200-70 240 90 210-50v130H0z"/>
+    </svg>
+    <aside class="hub-rail">
+        <div class="hub-brand">SUMMIT</div>
+        <nav id="hub-nav" aria-label="Seções da campanha"></nav>
+        <button class="rail-exit" data-act="exit-save" aria-label="Sair do Save" title="Sair do Save: volta à seleção de slots sem apagar nada"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" d="M14 4H5v16h9M10 12h11M17 8l4 4-4 4"/></svg><span>Sair do Save</span></button>
+    </aside>
+    <main class="hub-main">
+        <header id="hub-header"></header>
+        <section id="hub-panel"></section>
+    </main>
+    <div id="hero-stash" class="hidden"><canvas id="hero"></canvas></div>
+</div>
+
+<div id="prep" class="screen hidden" data-chapter="1">
+    <svg class="hub-backdrop" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMax slice" aria-hidden="true">
+        <path class="ridge ridge-far" d="M0 620 170 470l120 90 190-210 150 150 130-90 210 190 180-260 200 210 130-110 120 90v360H0z"/>
+        <path class="ridge ridge-mid" d="M0 720 210 590l150 90 170-150 210 170 180-120 170 130 230-190 280 200v180H0z"/>
+    </svg>
+    <div class="prep-layout">
+        <aside id="prep-info"></aside>
+        <div class="prep-center">
+            <div class="prep-title"><h3>Preparação</h3><span>Escolha até 3 habilidades para levar nesta fase.</span></div>
+            <div id="prep-slots"></div>
+            <div id="prep-grid" class="ab-grid"></div>
+            <small id="prep-locked"></small>
+        </div>
+        <aside id="prep-detail" class="detail"></aside>
+    </div>
+    <footer class="prep-actions">
+        <button class="btn" data-act="prep-back">Voltar</button>
+        <button class="btn" data-act="prep-clear" id="btn-prep-clear">Remover seleção</button>
+        <span class="spacer"></span>
+        <button class="btn hidden" data-act="prep-restart" id="btn-prep-restart">Recomeçar do início</button>
+        <button class="btn btn-primary btn-start" data-act="prep-start" id="btn-prep-start"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M6 3l14 9-14 9z"/></svg><span id="btn-prep-start-label">Iniciar Fase</span></button>
+    </footer>
+</div>
+
+<div id="options" class="screen hidden">
+    <h2>Opções</h2>
+    <div id="options-host"></div>
+    <button class="btn" data-act="back">Voltar</button>
+</div>
+
+<div id="settings-stash" class="hidden">
+    <div id="settings-body">
+        <section class="set-group">
+            <h3>Áudio</h3>
+            <label>Volume geral <input type="range" id="vol-master" min="0" max="1" step="0.05"></label>
+            <label>Música <input type="range" id="vol-music" min="0" max="1" step="0.05"></label>
+            <label>Efeitos <input type="range" id="vol-sfx" min="0" max="1" step="0.05"></label>
+            <button class="btn" data-act="mute" id="btn-mute"></button>
+        </section>
+        <section class="set-group">
+            <h3>Gráficos</h3>
+            <button class="btn" data-act="toggle-shake" id="btn-shake"></button>
+            <button class="btn" data-act="toggle-shadows" id="btn-shadows"></button>
+            <button class="btn" data-act="fullscreen">Tela cheia</button>
+            <h3 class="spaced">Idioma</h3>
+            <p class="set-note">Português (Brasil) é o único idioma disponível nesta versão.</p>
+            <h3 class="spaced">Sobre</h3>
+            <button class="btn" data-act="credits">Créditos</button>
+        </section>
+        <section class="set-group set-wide">
+            <h3>Controles</h3>
+            <div id="bind-list"></div>
+            <button class="btn" data-act="reset-keys">Restaurar teclas padrão</button>
+            <table>
+                <tr><td>Mover</td><td>← → ou A D</td></tr>
+                <tr><td>Escalar</td><td>Agarrar + ↑ ↓</td></tr>
+                <tr><td>Pulo na parede</td><td>Pular encostado na parede</td></tr>
+                <tr><td>Pancada no chão</td><td>↓ + Pular no ar</td></tr>
+                <tr><td>Reiniciar fase</td><td>R</td></tr>
+                <tr><td>Pausar</td><td>Esc ou P</td></tr>
+                <tr><td>Controle</td><td>A pular · B/X dash · LB, RB, Y habilidades · gatilhos agarrar</td></tr>
+            </table>
+            <p class="set-note">Pise nos inimigos ou acerte-os com o dash. Escudos só caem por trás ou por cima. Cristais recarregam o dash no ar. Paredes rachadas cedem ao dash. Morangos são opcionais.</p>
+        </section>
+        <section class="set-group set-wide" id="settings-danger">
+            <h3>Campanha</h3>
+            <button class="btn btn-danger" data-act="reset">Apagar esta campanha</button>
+        </section>
+    </div>
+</div>
+
+<div id="dialog" class="screen hidden">
+    <div class="dialog-box">
+        <p id="dialog-text"></p>
+        <div class="buttons row">
+            <button id="dialog-no" class="btn">Cancelar</button>
+            <button id="dialog-yes" class="btn btn-danger">Confirmar</button>
+        </div>
+    </div>
+</div>
+
+<script type="module" src="js/main.js"></script>
+</body>
+</html>

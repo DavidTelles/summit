@@ -1,0 +1,20 @@
+export const STEP = 1 / 120;
+export const MAX_STEPS_PER_FRAME = 12;
+
+export const RUN = 9;
+export const GRAVITY = 32;
+export const JUMP = 15;
+export const MAX_FALL = 18;
+export const POUND_SPEED = 30;
+export const DASH_SPEED = 20;
+export const DASH_TIME = 0.16;
+export const STAMINA_MAX = 6;
+export const PW = 0.7;
+export const PH = 0.9;
+export const PLAYER_HP = 3;
+export const IFRAMES = 1.2;
+export const COYOTE = 0.1;
+export const JUMP_BUFFER = 0.12;
+export const CORNER_NUDGE = 0.28;
+export const POUND_RADIUS = 2.4;
+export const DEATH_TIME = 0.8;

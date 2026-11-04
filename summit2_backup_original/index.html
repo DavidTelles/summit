@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Summit</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<canvas id="c"></canvas>
+
+<div id="hud" class="hidden">
+    <div class="hud-left">
+        <div id="hud-level"></div>
+        <div id="hud-berries">🍓 0/0</div>
+        <div id="hud-deaths">💀 0</div>
+        <div id="hud-time">00:00.0</div>
+    </div>
+    <div class="hud-bars">
+        <div class="bar"><div id="stamina"></div></div>
+        <div id="dash-dot"></div>
+    </div>
+</div>
+
+<div id="toasts"></div>
+
+<div id="menu" class="screen menu-cinematic">
+    <div class="menu-top">
+        <h1 class="logo">SUMMIT</h1>
+    </div>
+    <div class="menu-bottom">
+        <div class="menu-options">
+            <button data-act="continue">Continuar</button>
+            <button data-act="newgame">Novo Jogo</button>
+            <button data-act="options">Opções</button>
+        </div>
+    </div>
+    <div class="menu-version">v1.0</div>
+</div>
+
+<div id="levels" class="screen hidden">
+    <h2>Fases</h2>
+    <div id="level-list"></div>
+    <button data-act="menu">Voltar</button>
+</div>
+
+<div id="saves" class="screen hidden">
+    <h2>Saves</h2>
+    <div id="save-list"></div>
+    <button data-act="menu">Voltar</button>
+</div>
+
+<div id="mode" class="screen hidden">
+    <h2>Novo Save</h2>
+    <p>Escolha o modo de jogo. Essa escolha é permanente.</p>
+    <div class="buttons">
+        <button data-act="mode-normal">Modo Normal</button>
+        <button data-act="mode-permadeath">Modo Morte Súbita</button>
+        <button data-act="menu">Voltar</button>
+    </div>
+</div>
+
+<div id="skills" class="screen hidden">
+    <h2>Habilidades</h2>
+    <div id="skill-list"></div>
+    <button data-act="menu">Voltar</button>
+</div>
+
+<div id="credits" class="screen hidden">
+    <h2>Créditos</h2>
+    <p>Summit — uma jornada em três capítulos.</p>
+    <button data-act="menu">Voltar</button>
+</div>
+
+<div id="death" class="screen hidden">
+    <h2 id="death-title">Você morreu</h2>
+    <p id="death-msg"></p>
+    <div class="buttons">
+        <button data-act="menu">Menu</button>
+    </div>
+</div>
+
+<div id="achievements" class="screen hidden">
+    <h2>Conquistas <small id="ach-count"></small></h2>
+    <div id="ach-list"></div>
+    <div class="buttons row">
+        <button data-act="menu">Voltar</button>
+        <button data-act="reset" class="danger">Apagar progresso</button>
+    </div>
+</div>
+
+<div id="controls" class="screen hidden">
+    <h2>Controles</h2>
+    <table>
+        <tr><td>Mover</td><td>← → ou A D</td></tr>
+        <tr><td>Pular</td><td>Espaço, C ou Z</td></tr>
+        <tr><td>Dash (8 direções)</td><td>X, K ou J + setas</td></tr>
+        <tr><td>Agarrar parede / escalar</td><td>Shift, V ou L + ↑ ↓</td></tr>
+        <tr><td>Pulo na parede</td><td>Pular encostado na parede</td></tr>
+        <tr><td>Reiniciar fase</td><td>R</td></tr>
+        <tr><td>Pausar</td><td>Esc ou P</td></tr>
+    </table>
+    <p class="tip">Pise nos inimigos ou acerte-os com o dash. Cristais recarregam o dash no ar. Morangos são opcionais.</p>
+    <button data-act="menu">Voltar</button>
+    <button data-act="mute">Som: ligado</button>
+</div>
+
+<div id="pause" class="screen hidden">
+    <div class="buttons">
+        <button data-act="resume">Continuar</button>
+        <button data-act="restart">Reiniciar fase</button>
+        <button data-act="menu">Menu principal</button>
+    </div>
+</div>
+
+<div id="complete" class="screen hidden">
+    <h2 id="complete-title">Fase completa!</h2>
+    <div id="complete-stats"></div>
+    <div class="buttons">
+        <button data-act="next" id="btn-next">Próxima fase</button>
+        <button data-act="restart">Jogar de novo</button>
+        <button data-act="menu">Menu</button>
+    </div>
+</div>
+
+<div id="campaign" class="screen hidden">
+    <h2 id="campaign-title">Campanha</h2>
+    <div class="buttons">
+        <button data-act="camp-continue">Continuar jornada</button>
+        <button data-act="camp-chapters">Capítulos</button>
+        <button data-act="camp-achievements">Conquistas</button>
+        <button data-act="camp-skills">Habilidades</button>
+        <button data-act="camp-stats">Estatísticas</button>
+        <button data-act="camp-settings">Configurações</button>
+        <button data-act="menu">Voltar ao menu principal</button>
+    </div>
+</div>
+
+<div id="stats" class="screen hidden">
+    <h2>Estatísticas</h2>
+    <div id="stats-list"></div>
+    <button data-act="campaign">Voltar</button>
+</div>
+
+<div id="options" class="screen hidden">
+    <h2>Opções</h2>
+    <div class="buttons">
+        <label>Volume geral <input type="range" id="vol-master" min="0" max="1" step="0.05" value="1"></label>
+        <button data-act="fullscreen">Tela cheia</button>
+        <button data-act="controls">Controles</button>
+        <button data-act="credits">Créditos</button>
+        <button data-act="menu">Voltar</button>
+    </div>
+</div>
+
+<script type="module" src="js/main.js"></script>
+</body>
+</html>

@@ -1,0 +1,23 @@
+SUMMIT - plataforma 3D para web (three.js)
+
+COMO JOGAR
+Os modulos ES do navegador nao funcionam abrindo o index.html com duplo clique.
+Rode um servidor local na pasta:
+
+  python -m http.server 8080      (depois abra http://localhost:8080)
+  ou: npx serve .
+  ou no Windows: de dois cliques em run.bat
+
+Tambem funciona hospedado (Vercel, GitHub Pages, Netlify) - e so enviar a pasta.
+
+CONTROLES
+Mover: setas ou A D | Pular: Espaco/C/Z | Dash: X/K/J + direcao
+Agarrar parede: Shift/V/L + cima/baixo | Reiniciar: R | Pausar: Esc/P
+Pancada no chao (apos a fase 10): baixo + Pular no ar
+Menus: setas, Enter e Esc. Controle de videogame tambem funciona.
+
+TESTES (Node 22, sem instalar nada)
+  node --test tests/gameplay.test.mjs     regras, saves, chefes, fases
+  node tests/solver.mjs                   prova que cada fase pode ser concluida
+  node tests/solver.mjs 6,7 --berries     idem, incluindo os morangos
+  node tests/browser.mjs                  navegador real, com capturas de tela

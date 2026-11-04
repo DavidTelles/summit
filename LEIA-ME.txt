@@ -1,0 +1,32 @@
+SUMMIT - plataforma 3D para web (three.js)
+
+COMO JOGAR
+Os modulos ES do navegador nao funcionam abrindo o index.html com duplo clique.
+Rode um servidor local na pasta:
+
+  python -m http.server 8080      (depois abra http://localhost:8080)
+  ou: npx serve .
+  ou no Windows: de dois cliques em run.bat
+
+Tambem funciona hospedado (Vercel, GitHub Pages, Netlify) - e so enviar a pasta.
+
+CONTROLES (podem ser trocados em Configuracoes)
+Mover: setas ou A D | Pular: Espaco/C/Z | Dash: X/K/J + direcao
+Agarrar parede: Shift/V/L + cima/baixo | Reiniciar: R | Pausar: Esc/P
+Pancada no chao (apos a fase 10): baixo + Pular no ar
+Habilidades equipadas: Q, E e F (controle: LB, RB e Y)
+Menus: setas, Enter e Esc. No controle: direcional, A confirma e B volta.
+
+CENTRAL DA CAMPANHA
+Cada save abre a sua central: Inicio, Capitulos, Habilidades, Conquistas,
+Estatisticas e Configuracoes. "Sair do Save" volta aos tres slots sem apagar nada.
+Antes de cada fase, a tela de preparacao permite levar ate 3 habilidades.
+Os 5 movimentos base (Dash, Escalada, Pulo Duplo, Dash Aereo e Pancada) ficam
+sempre ativos e nao ocupam espaco: as fases foram desenhadas para exigi-los.
+
+TESTES (Node 22, sem instalar nada)
+  node --test tests/gameplay.test.mjs     regras, saves, chefes, fases
+  node --test tests/abilities.test.mjs    habilidades, selecao, evolucao, isolamento
+  node tests/solver.mjs                   prova que cada fase pode ser concluida
+  node tests/solver.mjs 6,7 --berries     idem, incluindo os morangos
+  node tests/browser.mjs                  navegador real, com capturas de tela
