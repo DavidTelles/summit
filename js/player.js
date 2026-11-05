@@ -265,6 +265,7 @@ export function updatePlayer(game, p, dt) {
         if (p.stepTimer <= 0) {
             p.stepTimer = 2.8;
             Sfx.step();
+            game.view.emit(p.x - p.facing * 0.15, p.y + 0.05, 0xb9b09a, 1, 0.8, 0.28);
         }
     }
     if (p.y < -4) game.kill('fall');

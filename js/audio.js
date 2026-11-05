@@ -8,7 +8,11 @@ const CHORDS = {
     boss2: [[147, 175, 233], [139, 165, 220], [131, 165, 196], [156, 185, 233]],
     boss3: [[55, 82, 110], [52, 78, 104], [49, 73, 98], [58, 87, 117]]
 };
-const BEAT = { 1: 2.4, 2: 2.0, 3: 1.7, boss: 0.46, boss2: 0.34, boss3: 0.58 };
+CHORDS.cine_intro = [[147, 220, 294], [131, 196, 262], [165, 220, 330], [123, 185, 247]];
+CHORDS.cine_final = [[110, 165, 220], [98, 147, 196], [131, 196, 262], [110, 165, 247]];
+const BEAT = {
+    cine_intro: 3.4,
+    cine_final: 5.2, 1: 2.4, 2: 2.0, 3: 1.7, boss: 0.46, boss2: 0.34, boss3: 0.58 };
 const LOOKAHEAD = 0.5;
 
 export const Sfx = {
@@ -94,6 +98,11 @@ export const Sfx = {
         s.start();
     },
     setTheme(theme, wind = 0.03) {
+        if (this.musicFaded && this.ctx) {
+            this.musicFaded = false;
+            this.musicBus.gain.cancelScheduledValues(this.ctx.currentTime);
+            this.applyVolumes();
+        }
         if (theme === this.theme) return;
         this.theme = theme;
         this.bar = 0;
@@ -135,11 +144,42 @@ export const Sfx = {
             if (this.bar % 4 === 3) this.tone(34, 0.26, 'sine', 0.3, -6, delay, this.musicBus);
             return;
         }
+        if (this.theme === 3 && this.bar % 12 >= 10) {
+            this.tone(41, beat * 1.4, 'sine', 0.1, -6, delay, this.musicBus);
+            return;
+        }
         const chord = chords[this.bar % chords.length];
+        if (this.theme === 'cine_final') {
+            chord.forEach(f => this.tone(f, beat * 1.4, 'sine', 0.035, 0, delay, this.musicBus));
+            return;
+        }
+        if (this.theme === 1 && this.bar % 3 === 1) [2093, 2637].forEach((f, i) => this.tone(f, 1.1, 'sine', 0.012, 0, delay + 0.4 + i * 0.32, this.musicBus));
+        if (this.theme === 2) {
+            for (let i = 0; i < 4; i++) this.tone(chord[i % 3] / 2, beat * 0.2, 'sawtooth', 0.018, 0, delay + (i * beat) / 4, this.musicBus);
+            if (this.bar % 2 === 0) this.noise(0.09, 4200, 0.022, 3, 0, delay + beat * 0.6);
+        }
+        if (this.theme === 3 && this.bar % 2 === 0) this.tone(46, beat * 1.1, 'sine', 0.12, -8, delay, this.musicBus);
+        if (this.theme === 'cine_intro' && this.bar % 2) this.tone(chord[2] * 2, beat, 'sine', 0.02, 0, delay + 0.8, this.musicBus);
         chord.forEach(f => this.tone(f, beat * 1.5, 'sine', 0.06, 0, delay, this.musicBus));
         const note = chord[(this.bar * 2) % 3] * 2;
         if (this.bar % 2 === 0) this.tone(note, beat * 0.9, 'triangle', 0.03, 0, delay + beat / 2, this.musicBus);
     },
+    fadeMusic(seconds) {
+        if (!this.ctx) return;
+        const now = this.ctx.currentTime;
+        this.musicFaded = true;
+        this.musicBus.gain.cancelScheduledValues(now);
+        this.musicBus.gain.setValueAtTime(this.musicBus.gain.value, now);
+        this.musicBus.gain.linearRampToValueAtTime(0.0001, now + seconds);
+        this.ambientGain.gain.linearRampToValueAtTime(0.0001, now + seconds);
+    },
+    relic() { this.tone(1320, 2.4, 'sine', 0.05, 180); this.tone(660, 2.8, 'sine', 0.04, 0, 0.3); },
+    coreVoice() { this.tone(55, 3.2, 'sine', 0.28); this.tone(110, 2.8, 'sine', 0.06, 0, 0.2); this.noise(2.4, 240, 0.05, 0.4); },
+    aetherFlow() { [220, 330, 440, 660, 880].forEach((f, i) => this.tone(f, 2.6, 'sine', 0.04, 0, i * 0.5)); },
+    humanGaze() { this.tone(392, 1.8, 'sine', 0.05, -30); },
+    flowerBloom() { [784, 1175].forEach((f, i) => this.tone(f, 1, 'sine', 0.05, 0, i * 0.3)); },
+    record() { this.tone(988, 0.3, 'sine', 0.07); this.tone(1319, 0.6, 'sine', 0.06, 0, 0.14); },
+    storyTick() { this.tone(520, 0.1, 'sine', 0.025); },
     jump() { this.tone(300, 0.14, 'square', 0.04, 250); },
     doubleJump() { this.tone(460, 0.16, 'triangle', 0.08, 500); this.noise(0.12, 2600, 0.04); },
     wallJump() { this.tone(360, 0.12, 'square', 0.04, 300); this.noise(0.06, 900, 0.07); },

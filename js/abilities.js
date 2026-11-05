@@ -153,7 +153,7 @@ export const ABILITIES = [
     },
     {
         id: 'perception', name: 'Percepção', icon: 'eye', category: 'support', type: 'passive',
-        desc: 'Faz paredes rachadas e áreas secretas próximas brilharem e avisa no painel.',
+        desc: 'Faz paredes rachadas, áreas secretas e registros próximos brilharem e avisa no painel.',
         unlock: { level: 4 },
         levels: [
             { text: 'Detecta a até 10 blocos.', radius: 10 },

@@ -205,6 +205,7 @@ export class Lava {
 
     sync(t) {
         this.mesh.position.y = this.level + Math.sin(t * 2) * 0.05;
+        E.animateLava(this.mesh, t);
     }
 }
 

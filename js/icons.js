@@ -18,6 +18,7 @@ const LINES = {
     recall: 'M4 12a8 8 0 1 0 2.500-5.800M4 3v5h5M12 8v4l3 2',
     hourglass: 'M7 2v4c0 3 5 4 5 6s-5 3-5 6v4M17 2v4c0 3-5 4-5 6s5 3 5 6v4M5 2h14M5 22h14',
     summit: 'M2 21 12 3l10 18zM8 14l4-3 4 3',
+    scroll: 'M6 3h12v15a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3v-2h12v2M6 3v13M9 7h6M9 11h6',
     home: 'M3 11l9-8 9 8M6 9v12h12V9M10 21v-6h4v6',
     route: 'M2 20 9 7l4 7 2-3 7 9zM9 7V2',
     spark: 'M12 2l2.500 7.500L22 12l-7.500 2.500L12 22l-2.500-7.500L2 12l7.500-2.500z',

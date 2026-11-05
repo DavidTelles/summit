@@ -7,6 +7,7 @@
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><filter id="ink-rough" x="-5%" y="-5%" width="110%" height="110%"><feTurbulence type="fractalNoise" baseFrequency="0.09" numOctaves="2" seed="4"/><feDisplacementMap in="SourceGraphic" scale="1.3"/></filter></svg>
 <canvas id="c"></canvas>
 <div id="vignette"></div>
 <div id="screen-flash"></div>
@@ -40,12 +41,15 @@
 </div>
 <div id="banner" class="hidden"><small id="banner-kicker"></small><b id="banner-title"></b><span id="banner-sub"></span></div>
 <div id="checkpoint-note" class="hidden">Checkpoint</div>
+<div id="story-line" class="hidden" role="status"><small id="story-who"></small><span id="story-text"></span></div>
+<div id="cinema" class="hidden"><div id="cine-fade"></div><p id="cine-caption" aria-live="polite"></p><button id="cine-skip" data-act="cine-skip">Pular cena <kbd>Esc</kbd></button><small id="cine-hint">Enter avança</small></div>
 <div id="toasts"></div>
 
 <div id="menu" class="screen menu-cinematic">
     <div class="menu-top">
+        <svg class="logo-peak" viewBox="0 0 220 44" aria-hidden="true"><path d="M2 42 L60 22 L84 30 L110 3 L134 28 L160 19 L218 42" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M110 3 L103 20 L110 16 L117 24" fill="none" stroke="currentColor" stroke-width="1.2"/></svg>
         <h1 class="logo">SUMMIT</h1>
-        <p class="tagline">Uma jornada em três capítulos</p>
+        <p class="tagline">A jornada de Kael até o coração do Cume</p>
     </div>
     <div class="menu-bottom">
         <div class="menu-options">

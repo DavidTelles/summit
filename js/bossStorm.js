@@ -57,8 +57,7 @@ class StormOrb {
 
     update(game, dt, p) {
         const m = this.mesh;
-        m.rotation.x += dt * 3;
-        m.rotation.y += dt * 5;
+        m.rotation.z += dt * 3;
         if (this.state === 'return') {
             const c = this.boss.dyingPoint();
             const dx = c.x - this.x;
@@ -91,7 +90,7 @@ class StormOrb {
             const blast = m.userData.blast;
             blast.visible = Math.floor(this.life * 14) % 2 === 0 || this.life < 0.2;
             blast.scale.setScalar(ORB_RADIUS);
-            blast.rotation.set(-m.rotation.x, -m.rotation.y, 0);
+            blast.rotation.z = -m.rotation.z;
             if (this.life <= 0) {
                 this.explode(game, p);
                 return;
@@ -172,7 +171,7 @@ export class StormBoss extends Boss {
     constructor(game) {
         const a = game.level.arena;
         super(game, { x: (a.x1 + a.x2) / 2, y: a.floor + 13 }, {
-            hp: 6, thresholds: [4, 2], name: 'Olho da Tempestade', title: 'O céu inteiro caça você', w: 3.4, h: 3.4
+            hp: 6, thresholds: [4, 2], name: 'Olho da Tempestade', title: 'Aethos, o Observador', w: 3.4, h: 3.4
         });
         this.theme = 'boss2';
         this.highY = this.y;

@@ -295,6 +295,11 @@ export class AbilitySystem {
             found = true;
             game.view.emit(t.x, t.y, 0xd9c8ff, 5, 1.6, 0.7);
         }
+        for (const stone of game.recordStones) {
+            if (stone.got || Math.hypot(stone.x - p.x, stone.y - p.y) > r) continue;
+            found = true;
+            game.view.emit(stone.x, stone.y, 0x6fcfff, 5, 1.6, 0.7);
+        }
         if (slot.stats.berries) {
             for (const b of game.berries) {
                 if (b.got || Math.hypot(b.x - p.x, b.y - p.y) > r) continue;
@@ -321,6 +326,7 @@ export class AbilitySystem {
             this.staminaLock = STAMINA_LOCK;
         }
         s.pulse = 0.35;
+        p.casting = 0.4;
         const d = Save.data;
         if (d) d.abilityUses++;
         if (s.stats.duration) s.active = s.stats.duration;

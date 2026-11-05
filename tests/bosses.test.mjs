@@ -509,6 +509,7 @@ test('Guardião: derrota refaz o chão, baixa a lava e o portal é alcançável 
     run(game, 3);
     assert.equal(b.mode, 'dead');
     assert.ok(b.lava.level <= a.floor - 2);
+    run(game, 5.2);
     delete game.hurtPlayer;
     delete game.kill;
     let finished = false;

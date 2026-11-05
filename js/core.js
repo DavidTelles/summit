@@ -1,4 +1,5 @@
 import { ABILITIES, LOADOUT_SIZE, abilityById, meetsReq } from './abilities.js';
+import { TOTAL_RECORDS, recordsFound, sanitizeStory } from './story.js';
 
 const PAD_MAP = [
     [0, 'PadJump'], [1, 'PadDash'], [2, 'PadDash'], [3, 'PadSkill3'], [4, 'PadSkill1'], [5, 'PadSkill2'],
@@ -92,7 +93,10 @@ export const ACHIEVEMENTS = [
     { id: 'trial_ch3', icon: 'trophy', name: 'Provação do Núcleo', desc: 'Vença um desafio opcional do Capítulo 3.', secret: true },
     { id: 'all_skills', icon: 'star', name: 'Mestre', desc: 'Desbloqueie todas as habilidades.', secret: false },
     { id: 'first_loadout', icon: 'spark', name: 'Bem Preparado', desc: 'Inicie uma fase com 3 habilidades equipadas.', secret: false },
-    { id: 'ability_max', icon: 'spark', name: 'Domínio', desc: 'Evolua uma habilidade até o nível máximo.', secret: false }
+    { id: 'ability_max', icon: 'spark', name: 'Domínio', desc: 'Evolua uma habilidade até o nível máximo.', secret: false },
+    { id: 'first_record', icon: 'scroll', name: 'Quem Lê', desc: 'Encontre um registro opcional.', secret: false },
+    { id: 'all_records', icon: 'scroll', name: 'Cronista', desc: 'Reúna todos os registros de uma campanha.', secret: false },
+    { id: 'core_reached', icon: 'eye', name: 'O Silêncio', desc: 'Responda à pergunta do Núcleo.', secret: true }
 ];
 
 export function achievementProgress(id, d) {
@@ -103,6 +107,7 @@ export function achievementProgress(id, d) {
         case 'die_50': return bar(d.deaths, 50);
         case 'stomp_5': return bar(d.stomps, 5);
         case 'crystal_10': return bar(d.crystals, 10);
+        case 'all_records': return bar(recordsFound(d), TOTAL_RECORDS);
         case 'all_skills': return bar(d.skills.length + Object.keys(d.abilities).length, SKILLS.length + ABILITIES.length);
         default: return null;
     }
@@ -116,7 +121,7 @@ export const SKILLS = [
     { id: 'ground_pound', icon: 'peak', name: 'Pancada no Chão', desc: '↓ + Pular no ar: ataque em área que quebra pisos rachados.', unlock: 'Após a fase 10' }
 ];
 
-const SAVE_VERSION = 3;
+const SAVE_VERSION = 4;
 const SLOT_COUNT = 3;
 const LEVEL_COUNT = 12;
 const FIRST_REDESIGNED_LEVEL = 5;
@@ -189,6 +194,7 @@ export function sanitizeSave(raw) {
         abilityUses: num(raw.abilityUses)
     };
     sanitizeAbilities(data, raw);
+    data.story = sanitizeStory(raw.story, data, version);
     return data;
 }
 
@@ -227,6 +233,27 @@ export const Save = {
         try { localStorage.removeItem(backupKey(i)); } catch (e) {}
         this.setActive(i);
         this.write(i);
+    },
+    discoverRecord(id) {
+        const d = this.data;
+        if (!d || d.story.records[id]) return false;
+        d.story.records[id] = true;
+        this.save();
+        return true;
+    },
+    sawMoment(id) {
+        const d = this.data;
+        if (!d || d.story.moments[id]) return false;
+        d.story.moments[id] = true;
+        this.save();
+        return true;
+    },
+    sawScene(id) {
+        const d = this.data;
+        if (!d || d.story.scenes[id]) return false;
+        d.story.scenes[id] = true;
+        this.save();
+        return true;
     },
     setActive(i) {
         this.active = i;

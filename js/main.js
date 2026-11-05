@@ -8,6 +8,8 @@ import { Sfx } from './audio.js';
 import { icon } from './icons.js';
 import { createHub, fmtLong, fmtTime as fmt } from './hub.js';
 import { HeroStage } from './hero.js';
+import { Cinema } from './cinema.js';
+import { SCENE_AFTER_LEVEL, pendingScene } from './story.js';
 
 const $ = id => document.getElementById(id);
 const screens = ['menu', 'pause', 'complete', 'saves', 'mode', 'credits', 'death', 'options', 'hub', 'prep'];
@@ -22,6 +24,20 @@ Save.load();
 Input.init();
 
 const view = new View($('c'));
+const cinema = new Cinema(view, {
+    onCaption(text, style) {
+        const el = $('cine-caption');
+        el.classList.toggle('voice', style === 'voice');
+        el.classList.remove('show');
+        if (!text) return;
+        el.textContent = text;
+        void el.offsetWidth;
+        el.classList.add('show');
+    },
+    onFade(amount) {
+        $('cine-fade').style.opacity = amount;
+    }
+});
 let state = 'menu';
 let currentLevel = 0;
 let currentScreen = 'menu';
@@ -31,6 +47,7 @@ let saveScreenMode = 'continue';
 let dialogResolve = null;
 let lastFinal = null;
 let rebinding = null;
+let sceneRun = null;
 const hudCache = {};
 
 const setHtml = (id, html) => {
@@ -171,29 +188,21 @@ const game = new Game(view, {
         $('boss-cue').textContent = '';
         $('boss-bar').classList.remove('shielded');
         $('boss-bar').classList.add('hidden');
+    },
+    onBossEpilogue() {
         showBanner('Vitória', 'Caminho livre', 'Siga até o portal.', 2400);
     },
+    onStoryLine(text, who, duration) {
+        showStoryLine(text, who, duration);
+    },
+    onRecord(record) {
+        toast('scroll', 'Registro encontrado', record.title);
+    },
     onComplete(r) {
-        state = 'complete';
-        Sfx.setTheme(null);
-        document.body.classList.remove('slowmo');
-        $('hud').classList.add('hidden');
-        $('hud-abilities').classList.add('hidden');
-        $('boss-bar').classList.add('hidden');
-        $('complete-kicker').textContent = r.lastOfChapter ? `Capítulo ${r.chapter} concluído` : `Capítulo ${r.chapter} · Fase ${r.index + 1}`;
-        $('complete-title').textContent = r.last ? 'Você chegou ao cume!' : r.lastOfChapter ? CHAPTER_NAMES[r.chapter] : r.name;
         const d = Save.data;
-        const extra = r.lastOfChapter && d ? stat('Mortes no capítulo', d.chapterDeaths[r.chapter - 1]) : '';
-        $('complete-stats').innerHTML = stat('Tempo', fmt(r.time) + (r.record ? ' <em>recorde!</em>' : ''))
-            + stat('Morangos', `${r.berries}/${r.totalBerries}`) + stat('Mortes', r.deaths) + extra;
-        $('complete-unlocks').innerHTML = r.newAbilities.length
-            ? `<small>Habilidades desbloqueadas</small><div>${r.newAbilities.map(a => `<span class="unlock-chip cat-${a.category}">${icon(a.icon)} ${a.name}</span>`).join('')}</div>` : '';
-        $('complete-unlocks').classList.toggle('hidden', !r.newAbilities.length);
-        $('btn-next').textContent = r.lastOfChapter ? 'Próximo capítulo' : 'Próxima fase';
-        $('btn-next').classList.toggle('hidden', r.last);
-        currentLevel = r.index;
-        navStack = [];
-        show('complete');
+        const scene = SCENE_AFTER_LEVEL[r.index];
+        if (scene && d && !d.story.scenes[scene]) playScene(scene, () => showComplete(r));
+        else showComplete(r);
     },
     onPermadeathCommit() {
         const d = Save.data;
@@ -222,13 +231,79 @@ const hub = createHub({
     start,
     currentScreen: () => currentScreen,
     mountSettings,
-    createHero: canvas => new HeroStage(canvas)
+    createHero: canvas => new HeroStage(canvas),
+    replayScene: id => playScene(id, () => enterHub('records'), true)
 });
 
 function focusFirst(name) {
     const el = $(name);
     const target = el && el.querySelector('button:not(.hidden):not([disabled])');
     if (target) target.focus({ preventScroll: true });
+}
+
+function showComplete(r) {
+    state = 'complete';
+    Sfx.setTheme(null);
+    document.body.classList.remove('slowmo');
+    $('hud').classList.add('hidden');
+    $('hud-abilities').classList.add('hidden');
+    $('boss-bar').classList.add('hidden');
+    $('complete-kicker').textContent = r.lastOfChapter ? `Capítulo ${r.chapter} concluído` : `Capítulo ${r.chapter} · Fase ${r.index + 1}`;
+    $('complete-title').textContent = r.last ? 'A montanha em silêncio' : r.lastOfChapter ? CHAPTER_NAMES[r.chapter] : r.name;
+    const d = Save.data;
+    const extra = r.lastOfChapter && d ? stat('Mortes no capítulo', d.chapterDeaths[r.chapter - 1]) : '';
+    $('complete-stats').innerHTML = stat('Tempo', fmt(r.time) + (r.record ? ' <em>recorde!</em>' : ''))
+        + stat('Morangos', `${r.berries}/${r.totalBerries}`) + stat('Mortes', r.deaths) + extra;
+    $('complete-unlocks').innerHTML = r.newAbilities.length
+        ? `<small>Habilidades desbloqueadas</small><div>${r.newAbilities.map(a => `<span class="unlock-chip cat-${a.category}">${icon(a.icon)} ${a.name}</span>`).join('')}</div>` : '';
+    $('complete-unlocks').classList.toggle('hidden', !r.newAbilities.length);
+    $('btn-next').textContent = r.lastOfChapter ? 'Próximo capítulo' : 'Próxima fase';
+    $('btn-next').classList.toggle('hidden', r.last);
+    currentLevel = r.index;
+    navStack = [];
+    show('complete');
+}
+
+function showStoryLine(text, who, duration = Math.max(3.2, text.length * 0.075)) {
+    const el = $('story-line');
+    $('story-who').textContent = who || '';
+    $('story-text').textContent = text;
+    el.classList.remove('hidden', 'show');
+    void el.offsetWidth;
+    el.classList.add('show');
+    Sfx.storyTick();
+    clearTimeout(showStoryLine.timer);
+    showStoryLine.timer = setTimeout(() => el.classList.add('hidden'), duration * 1000);
+}
+
+function playScene(id, done, replay = false) {
+    game.flushPlaytime();
+    game.running = false;
+    state = 'cinema';
+    sceneRun = { id, done, replay };
+    hideAll();
+    clearTimeout(showStoryLine.timer);
+    ['story-line', 'hud', 'hud-abilities', 'boss-bar', 'banner'].forEach(el => $(el).classList.add('hidden'));
+    document.body.classList.remove('slowmo');
+    document.body.classList.add('cinematic');
+    $('cinema').classList.remove('hidden');
+    cinema.play(id);
+}
+
+function endScene() {
+    const run = sceneRun;
+    sceneRun = null;
+    cinema.release();
+    view.restoreGrade();
+    $('cinema').classList.add('hidden');
+    document.body.classList.remove('cinematic');
+    $('cine-caption').classList.remove('show');
+    if (!run.replay) {
+        Save.sawScene(run.id);
+        if (run.id === 'final') game.unlock('core_reached');
+    }
+    Sfx.setTheme(null);
+    run.done();
 }
 
 function show(name, remember = false) {
@@ -258,6 +333,11 @@ function hideAll() {
 }
 
 function enterHub(tab = 'home') {
+    const pending = Save.data && pendingScene(Save.data);
+    if (pending) {
+        playScene(pending, () => enterHub(tab));
+        return;
+    }
     game.flushPlaytime();
     game.running = false;
     state = 'hub';
@@ -359,7 +439,7 @@ function renderOptions() {
     $('vol-sfx').value = Settings.sfx;
     $('btn-mute').textContent = 'Som: ' + (Settings.muted ? 'desligado' : 'ligado');
     $('btn-shake').textContent = 'Tremor de tela: ' + (Settings.shake ? 'ligado' : 'reduzido');
-    $('btn-shadows').textContent = 'Sombras: ' + (Settings.shadows ? 'ligadas' : 'desligadas');
+    $('btn-shadows').textContent = 'Acabamento da imagem: ' + (Settings.shadows ? 'ligado' : 'desligado');
     renderBindings();
 }
 
@@ -416,9 +496,8 @@ const actions = {
     },
     'toggle-shadows'() {
         Settings.shadows = !Settings.shadows;
+        view.applyQuality();
         Settings.save();
-        view.renderer.shadowMap.enabled = Settings.shadows;
-        view.sun.castShadow = Settings.shadows;
         view.scene.traverse(o => { if (o.material) o.material.needsUpdate = true; });
         renderOptions();
     },
@@ -470,6 +549,9 @@ const actions = {
         renderSaves();
         navStack = ['menu'];
         show('saves');
+    },
+    'cine-skip'() {
+        cinema.skip();
     },
     resume() {
         hideAll();
@@ -646,6 +728,12 @@ addEventListener('keydown', e => {
 
 addEventListener('keydown', e => {
     if (e.repeat) return;
+    if (state === 'cinema') {
+        e.preventDefault();
+        if (['Escape', 'PadDash', 'KeyP'].includes(e.code)) cinema.skip();
+        else if (['Enter', 'Space', 'PadJump'].includes(e.code)) cinema.advance();
+        return;
+    }
     if (state === 'playing') {
         const p = game.player;
         const permaDying = game.permadeathPending;
@@ -691,7 +779,12 @@ function loop(now) {
     const dt = Math.min(0.1, (now - last) / 1000);
     last = now;
     Input.pollGamepad();
-    if (state === 'playing') {
+    if (state === 'cinema') {
+        Input.endFrame();
+        cinema.update(dt);
+        if (cinema.playing) cinema.render();
+        else endScene();
+    } else if (state === 'playing') {
         game.update(dt);
     } else {
         Input.endFrame();
@@ -700,7 +793,7 @@ function loop(now) {
     }
     if (state === 'hub') {
         if (currentScreen === 'hub' && hub.hero) hub.hero.update(dt);
-    } else {
+    } else if (state !== 'cinema') {
         view.render();
     }
     requestAnimationFrame(loop);
@@ -711,4 +804,4 @@ game.running = false;
 view.idle(0.016);
 requestAnimationFrame(loop);
 
-globalThis.__summit = { game, view, actions, Save, Settings, hub, get state() { return state; }, get screen() { return currentScreen; } };
+globalThis.__summit = { cinema, playScene, game, view, actions, Save, Settings, hub, get state() { return state; }, get screen() { return currentScreen; } };

@@ -108,7 +108,16 @@ await wait(200);
 check('tela de modo', await evaluate(visible('mode')));
 await shot('03-mode');
 await evaluate(`document.querySelector('[data-act=mode-normal]').click()`);
+await wait(1800);
+check('novo jogo abre a introdução', await evaluate(`__summit.state === 'cinema' && ${visible('cinema')}`));
+check('introdução mostra texto', (await evaluate(`document.getElementById('cine-caption').textContent`)) === 'A montanha não tem nome.');
+await shot('03b-intro-montanha');
+await key('Enter');
+await wait(400);
+check('Enter avança o plano', await evaluate(`__summit.cinema.active.index === 1`));
+await key('Escape');
 await wait(900);
+check('Esc pula a cena e abre a central', await evaluate(`__summit.state === 'hub' && __summit.Save.data.story.scenes.intro === true`));
 check('novo jogo entra na central do save', await evaluate(`__summit.screen === 'hub' && ${visible('hub')}`));
 check('personagem 3D renderizado na central', await evaluate(`(() => { const c = document.getElementById('hero'); return c.offsetWidth > 100 && c.closest('#hero-slot') !== null; })()`));
 await shot('04-central');
@@ -191,6 +200,99 @@ await wait(500);
 const fps = await frameTimes(2000);
 console.log(`FPS (renderização por software, sem GPU): ${fps?.toFixed(1)}`);
 
+const until = async (expression, ms = 30000) => {
+    const end = Date.now() + ms;
+    while (Date.now() < end) {
+        if (await evaluate(expression)) return true;
+        await wait(150);
+    }
+    return false;
+};
+const scenePlates = async (id, label) => {
+    await evaluate(`__summit.playScene('${id}', () => __summit.actions['to-hub'](), true)`);
+    const count = await evaluate(`__summit.cinema.active.def.shots.length`);
+    for (let i = 0; i < count; i++) {
+        await evaluate(`(() => { const c = __summit.cinema; const a = c.active; a.index = ${i} - 1; c.nextShot(); const s = a.def.shots[a.index]; const last = s.lines.at(-1); a.t = Math.max(0.8, Math.min(s.dur - 2.2, last ? last[0] + 0.3 : s.dur * 0.5)); })()`);
+        await wait(900);
+        await shot(`50-${label}-${i + 1}`);
+    }
+    await key('Escape');
+    await wait(500);
+};
+await evaluate(`(() => { const d = __summit.Save.data; Object.assign(d.story.scenes, { intro: true, ch1to2: true, ch2to3: true, final: true }); __summit.game.running = false; })()`);
+for (const [id, label] of [['intro', 'intro'], ['ch1to2', 'cap1-2'], ['ch2to3', 'cap2-3'], ['final', 'final']]) await scenePlates(id, label);
+check('cenas revistas não mudam o progresso', await evaluate(`__summit.state === 'hub'`));
+
+const place = (level, x, y) => evaluate(`(() => { const G = __summit.game; delete G.hurtPlayer; delete G.kill; __summit.actions.resume(); G.load(${level}); __summit.view.setDim(1); G.running = true; G.hurtPlayer = () => {}; G.kill = () => {}; G.player.x = ${x}; G.player.y = ${y}; G.spawn = { x: ${x}, y: ${y} }; G.view.follow(${x}, ${y}, 0, true); })()`);
+for (const [level, x, y, label] of [[0, 4, 2, '60-acampamento'], [1, 33, 2, '61-cidade'], [2, 44, 2, '62-caverna'], [3, 64, 14, '63-templo'], [4, 115, 30, '64-assento-varak'], [6, 86, 25, '65-diario'], [8, 52, 6, '66-observatorio'], [9, 41, 2, '67-maquinas'], [10, 30, 57, '68-quarentena'], [11, 77, 20, '69-tremor']]) {
+    await place(level, x, y);
+    await wait(1300);
+    await shot(label);
+}
+check('fala aparece sem pausar o jogo', await evaluate(`__summit.state === 'playing' && ${visible('story-line')}`));
+await place(3, 42, 17);
+await evaluate(`__summit.game.player.x = __summit.game.recordStones[0].x - 3`);
+await wait(500);
+await shot('70-pedra-registro');
+const stoneId = await evaluate(`(() => { const G = __summit.game; const s = G.recordStones[0]; G.player.x = s.x; G.player.y = s.y - 0.4; return s.id; })()`);
+await wait(300);
+check('pedra entrega o registro ao save', await evaluate(`__summit.Save.data.story.records['${stoneId}'] === true`));
+await shot('71-toast-registro');
+
+for (const [level, label, times] of [[4, '72-fim-varak', [2500, 3000, 3200]], [8, '73-fim-aethos', [2200, 3200, 2600]], [11, '74-fim-guardiao', [1800, 2400]]]) {
+    await place(level, 0, 0);
+    await evaluate(`(() => { const G = __summit.game; const a = G.level.arena; G.player.x = a.triggerX + 1; G.player.y = a.floor + 0.2; })()`);
+    await wait(4200);
+    await evaluate(`(() => { const b = __summit.game.boss; while (b.mode === 'fight') { b.vulnerable = true; b.invuln = 0; b.damage(); } })()`);
+    await until(`!!__summit.game.aftermath`, 40000);
+    check(`${label}: cena de encerramento ativa`, await evaluate(`!!__summit.game.aftermath && !__summit.game.aftermath.done`));
+    let i = 0;
+    for (const t of times) {
+        await wait(t);
+        await shot(`${label}-${++i}`);
+    }
+    check(`${label}: controle volta ao jogador`, await until(`__summit.game.aftermath.done && !__summit.game.cutscene`, 60000));
+}
+
+await evaluate(`(() => { const G = __summit.game; const d = __summit.Save.data; delete G.hurtPlayer; delete G.kill; delete d.story.scenes.final; delete d.best[11]; G.load(11); G.boss.mode = 'dead'; G.complete(); })()`);
+await wait(1600);
+check('concluir a última fase abre o final', await evaluate(`__summit.state === 'cinema' && __summit.cinema.active.id === 'final'`));
+await key('Escape');
+await wait(500);
+check('final leva à tela de conclusão', await evaluate(`__summit.screen === 'complete' && document.getElementById('complete-title').textContent === 'A montanha em silêncio'`));
+check('final conta conquista e fica salvo', await evaluate(`__summit.Save.data.story.scenes.final === true && __summit.Save.data.achievements.core_reached === true`));
+await shot('75-conclusao');
+await evaluate(`__summit.actions['to-hub']()`);
+await wait(400);
+await evaluate(`__summit.hub.setTab('records')`);
+await wait(300);
+await shot('76-registros');
+check('aba Registros lista e abre leitura', await evaluate(`document.querySelectorAll('.rec-row').length > 20 && !!document.querySelector('.rec-text')`));
+const lockedCount = await evaluate(`document.querySelectorAll('.rec-row.locked').length`);
+await evaluate(`document.querySelector('.rec-row:not(.locked)').click()`);
+await wait(150);
+check('registro selecionado permanece visível', await evaluate(`!!document.querySelector('.rec-row.selected')`));
+check('há registros ainda ocultos', lockedCount > 0, String(lockedCount));
+await send('Emulation.setDeviceMetricsOverride', { width: 760, height: 900, deviceScaleFactor: 1, mobile: false });
+await wait(400);
+await shot('77-registros-760');
+check('Registros cabem em 760 px', await evaluate(`(() => { const b = document.getElementById('hub'); return b.scrollWidth - b.clientWidth <= 1; })()`));
+await evaluate(`__summit.playScene('final', () => __summit.actions['to-hub'](), true)`);
+await wait(2000);
+await shot('78-final-760');
+await key('Escape');
+await wait(400);
+await send('Emulation.setDeviceMetricsOverride', { width: 1024, height: 640, deviceScaleFactor: 1, mobile: false });
+await evaluate(`__summit.playScene('intro', () => __summit.actions['to-hub'](), true)`);
+await wait(2000);
+await shot('79-intro-1024');
+await key('Escape');
+await wait(400);
+await send('Emulation.clearDeviceMetricsOverride');
+await wait(300);
+await place(0, 4, 2);
+await evaluate(`(() => { const G = __summit.game; delete G.hurtPlayer; delete G.kill; })()`);
+
 const click = sel => evaluate(`document.querySelector(${JSON.stringify(sel)}).click()`);
 const textOf = sel => evaluate(`document.querySelector(${JSON.stringify(sel)})?.textContent`);
 const count = sel => evaluate(`document.querySelectorAll(${JSON.stringify(sel)}).length`);
@@ -215,6 +317,7 @@ await evaluate(`(() => {
     const d = __summit.Save.data;
     d.unlocked = 7; d.currentLevel = 6; d.stomps = 22; d.berries = 26; d.crystals = 14; d.deaths = 9; d.totalTime = 2710;
     d.completedChapters = [1]; d.chapterDeaths = [6, 3, 0];
+    Object.assign(d.story.scenes, { intro: true, ch1to2: true, ch2to3: true, final: true });
     for (let i = 0; i < 6; i++) d.best[i] = { time: 42 + i * 11, berries: 4 };
     d.secrets['5:valley'] = true;
     Object.assign(d.achievements, { boss1: true, no_death: true, first_steps: true, stomp_5: true, berry_5: true, crystal_10: true, ch1_complete: true });
@@ -412,7 +515,10 @@ await wait(150);
 check('confirmação interna do jogo', await evaluate(visible('dialog')));
 await shot('17-dialogo');
 await evaluate(`document.getElementById('dialog-yes').click()`);
-await wait(500);
+await wait(600);
+check('Morte Súbita também abre a introdução', await evaluate(`__summit.state === 'cinema'`));
+await key('Escape');
+await wait(600);
 check('Morte Súbita entra na central', await evaluate(`__summit.screen === 'hub'`));
 await shot('38-central-morte-subita');
 check('slot novo não herda dados do outro', await evaluate(`__summit.Save.data.mode === 'permadeath' && __summit.Save.data.deaths === 0 && !__summit.Save.data.abilities.recall && __summit.Save.data.unlocked === 1`));

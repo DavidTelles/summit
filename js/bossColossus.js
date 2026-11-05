@@ -974,11 +974,11 @@ export class ColossusBoss extends Boss {
         [handL, handR].forEach((m, i) => {
             const h = this.hands[i];
             m.position.set(h.x - this.x, h.y - this.y, 0);
-            m.rotation.x = h.state === 'sweep' || h.state === 'sweepTell' ? 0.5 : 0;
+            m.rotation.z = (i ? 1 : -1) * (h.state === 'sweep' || h.state === 'sweepTell' ? 0.22 : 0);
         });
         for (const py of this.pylons) {
             if (!py.mesh.visible) continue;
-            py.mesh.userData.crystal.rotation.y = t * 1.5;
+            py.mesh.userData.crystal.rotation.z = Math.sin(t * 1.5) * 0.05;
             const urgent = this.phase === 0 && this.pylonClock > 0 && this.pylonClock < 4;
             py.mesh.userData.crystal.scale.setScalar(urgent ? 1 + Math.sin(t * 22) * 0.18 : 1);
         }

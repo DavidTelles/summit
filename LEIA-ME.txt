@@ -24,11 +24,22 @@ Antes de cada fase, a tela de preparacao permite levar ate 3 habilidades.
 Os 5 movimentos base (Dash, Escalada, Pulo Duplo, Dash Aereo e Pancada) ficam
 sempre ativos e nao ocupam espaco: as fases foram desenhadas para exigi-los.
 
+ARTE
+Toda a arte e desenhada por codigo em canvas 2D e exibida com three.js. Nao ha imagens externas.
+Em Configuracoes, "Acabamento da imagem" liga ou desliga nevoa, luz e pos-efeito.
+
+HISTORIA
+Voce e Kael. A cada campanha, cenas, falas e registros ficam salvos so naquele save.
+Pedras com inscricoes guardam registros opcionais; releia em Registros, na central.
+Esc pula uma cena; Enter avanca.
+
 TESTES (Node 22, sem instalar nada)
   node --test tests/gameplay.test.mjs     regras, saves, chefes, fases
   node --test tests/abilities.test.mjs    habilidades, selecao, evolucao, isolamento
+  node --test tests/story.test.mjs        historia, registros, cenas, migracao de saves
   node --test tests/bosses.test.mjs       chefes dos cap. 2 e 3, cap. 1 intacto, bots que vencem cada chefe
   node tests/bossBot.mjs                  relatorio dos bots: tempo, mortes e golpes por loadout
   node tests/solver.mjs                   prova que cada fase pode ser concluida
   node tests/solver.mjs 6,7 --berries     idem, incluindo os morangos
+  node tests/artShots.mjs [pasta]         capturas de cada fase, pose e chefe, com FPS
   node tests/browser.mjs                  navegador real, com capturas de tela

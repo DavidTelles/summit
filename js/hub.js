@@ -1,3 +1,4 @@
+import { CHAPTER_THREAD, RECORDS, RECORD_KINDS, SCENE_INFO, TOTAL_RECORDS, recordById, recordsFound } from './story.js';
 import { LEVELS } from './levels.js';
 import { ACHIEVEMENTS, Save, SKILLS, achievementProgress } from './core.js';
 import { ABILITIES, CATEGORIES, LOADOUT_SIZE, TYPE_LABEL, abilityById, meetsReq, reqProgress, reqText } from './abilities.js';
@@ -13,6 +14,7 @@ const TABS = [
     { id: 'home', label: 'Início', icon: 'home' },
     { id: 'chapters', label: 'Capítulos', icon: 'route' },
     { id: 'abilities', label: 'Habilidades', icon: 'spark' },
+    { id: 'records', label: 'Registros', icon: 'scroll' },
     { id: 'achievements', label: 'Conquistas', icon: 'trophy' },
     { id: 'stats', label: 'Estatísticas', icon: 'bars' },
     { id: 'settings', label: 'Configurações', icon: 'sliders' }
@@ -56,6 +58,8 @@ function reqLine(req, d) {
     const progress = !ok && reqProgress(req, d);
     return `<div class="req ${ok ? 'ok' : ''}">${icon(ok ? 'check' : 'lock')}<span>${reqText(req)}${progress ? ` <b>${progress[0]}/${progress[1]}</b>` : ''}</span></div>`;
 }
+
+const knowsBossName = (d, id) => (id === 'boss1' ? d.story.records.varak_champion || d.story.records.varak_refusal : d.story.records.aethos_notebook);
 
 function profileSvg(d) {
     const W = 1000;
@@ -154,8 +158,9 @@ export function createHub(ctx) {
             const finished = progress.done === progress.total;
             return `<div class="home">
                 <div class="home-left">
-                    <small class="kicker">Capítulo ${f.chapter}</small>
+                    <small class="kicker">Kael · Capítulo ${f.chapter}</small>
                     <h1 class="home-title">${CHAPTER_NAMES[f.chapter]}</h1>
+                    <p class="home-thread">${finished ? 'A montanha está em silêncio. O que resta é explorar o que ficou.' : CHAPTER_THREAD[f.chapter]}</p>
                     <div class="home-progress"><b>${progress.pct}%</b><span>da campanha · ${progress.done} de ${progress.total} fases</span>${meter(progress.pct)}</div>
                     <button class="btn btn-primary btn-hero" data-act="hub-continue" id="btn-continue">
                         ${icon('play')}<span><b>${finished ? 'Rejogar última fase' : resume ? 'Retomar jornada' : 'Continuar jornada'}</b><small>Fase ${index + 1} · ${f.name}${resume ? ' · do checkpoint' : ''}</small></span>
@@ -251,7 +256,7 @@ export function createHub(ctx) {
             const bosses = defeatedBosses(d);
             const ex = exploration(d);
             const tile = (ic, value, label, extra = '') => `<div class="stat-tile">${icon(ic)}<b>${value}</b><small>${label}</small>${extra}</div>`;
-            const rows = Object.entries(BOSSES).map(([id, b]) => `<li class="${d.achievements[id] ? 'done' : ''}">${icon(d.achievements[id] ? 'check' : 'lock')} ${d.achievements[id] ? b.name : 'Chefe desconhecido'} <small>Capítulo ${b.chapter}</small></li>`).join('');
+            const rows = Object.entries(BOSSES).map(([id, b]) => `<li class="${d.achievements[id] ? 'done' : ''}">${icon(d.achievements[id] ? 'check' : 'lock')} ${d.achievements[id] ? b.name : 'Chefe desconhecido'}${d.achievements[id] && b.lore && knowsBossName(d, id) ? ` <em>${b.lore}</em>` : ''} <small>Capítulo ${b.chapter}</small></li>`).join('');
             return `<div class="stat-grid">
                 ${tile('clock', fmtLong(d.totalTime), 'Tempo total de jogo')}
                 ${tile('skull', d.deaths, 'Mortes')}
@@ -259,6 +264,7 @@ export function createHub(ctx) {
                 ${tile('boss', `${bosses.length}<i>/3</i>`, 'Chefes derrotados')}
                 ${tile('eye', `${ex.secrets}<i>/${TOTAL_SECRETS}</i>`, 'Segredos encontrados')}
                 ${tile('berry', `${ex.berries}<i>/${TOTAL_BERRIES}</i>`, 'Morangos nas melhores marcas')}
+                ${tile('scroll', `${recordsFound(d)}<i>/${TOTAL_RECORDS}</i>`, 'Registros encontrados')}
             </div>
             <div class="stat-columns">
                 <div class="stat-block"><div class="stat-block-head"><span>Progresso de exploração</span><b>${ex.pct}%</b></div>${meter(ex.pct)}<small>Soma dos segredos encontrados e do melhor número de morangos de cada fase concluída.</small>
@@ -274,6 +280,33 @@ export function createHub(ctx) {
                     <ul class="stat-lines">${[1, 2, 3].map(ch => `<li>Capítulo ${ch}: ${CHAPTER_NAMES[ch]} <b>${d.chapterDeaths[ch - 1]}</b></li>`).join('')}</ul>
                 </div>
             </div>`;
+        },
+        records() {
+            const d = Save.data;
+            const found = recordsFound(d);
+            const open = recordById(ui.record);
+            const current = open && d.story.records[open.id] ? open : RECORDS.find(r => d.story.records[r.id]) || null;
+            ui.record = current ? current.id : null;
+            const groups = [1, 2, 3].map(ch => {
+                const rows = RECORDS.filter(r => r.chapter === ch).map(r => {
+                    const known = d.story.records[r.id];
+                    return known
+                        ? `<button class="rec-row ${current && current.id === r.id ? 'selected' : ''}" data-act="record-pick" data-arg="${r.id}">${icon('scroll')}<span><b>${r.title}</b><small>${RECORD_KINDS[r.kind]}</small></span></button>`
+                        : `<div class="rec-row locked">${icon('lock')}<span><b>Registro não encontrado</b><small>${r.auto ? 'A história chegará até você' : LEVELS[r.level].name}</small></span></div>`;
+                }).join('');
+                return `<div class="rec-group"><small class="kicker-soft">Capítulo ${ch} · ${CHAPTER_NAMES[ch]}</small>${rows}</div>`;
+            }).join('');
+            const scenes = Object.entries(SCENE_INFO).filter(([id]) => d.story.scenes[id]).map(([id, s]) =>
+                `<button class="chip" data-act="scene-replay" data-arg="${id}">${icon('play')} ${s.title}</button>`).join('');
+            return `<div class="section-head"><b class="big">${found}<i>/${TOTAL_RECORDS}</i></b><span>registros reunidos nesta campanha</span>${meter((found / TOTAL_RECORDS) * 100)}</div>
+                <div class="rec-layout">
+                    <div class="rec-list">${groups}</div>
+                    <article class="rec-reader">${current
+                        ? `<small class="kicker">${RECORD_KINDS[current.kind]}</small><h3>${current.title}</h3><p class="rec-text">${current.text}</p><small class="rec-source">${current.source}</small>`
+                        : '<p class="empty-note">Nada foi encontrado ainda. Pedras com inscrições brilhantes guardam o que restou do passado.</p>'}
+                        ${scenes ? `<div class="rec-scenes"><small class="kicker-soft">Rever cenas</small><div>${scenes}</div></div>` : ''}
+                    </article>
+                </div>`;
         },
         settings() {
             return '<div id="settings-host"></div>';
@@ -501,6 +534,14 @@ export function createHub(ctx) {
         },
         'prep-back'() {
             open(ui.tab);
+        },
+        'record-pick'(btn) {
+            ui.record = btn.dataset.arg;
+            render(false);
+            refocus(`.rec-row[data-arg=${ui.record}]`);
+        },
+        'scene-replay'(btn) {
+            ctx.replayScene(btn.dataset.arg);
         },
         'prep-start'() {
             ctx.start(ui.prep.index, ui.prep.resume);

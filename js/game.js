@@ -10,6 +10,9 @@ import { createPlayer, resetPlayerMotion, updatePlayer, playerPose } from './pla
 import { createHazard, isHazardDef, overlap } from './hazards.js';
 import { createEnemy, isEnemyDef } from './enemies.js';
 import { createBoss } from './bossRoster.js';
+import { LEVEL_STORY, RECORDS, TOTAL_RECORDS, recordById, recordsFound } from './story.js';
+import { makeDecor, makeRecordStone } from './decor.js';
+import { createAftermath } from './aftermath.js';
 
 const COMPLETE_DELAY = 0.9;
 const CRUMBLE_DELAY = 0.35;
@@ -32,6 +35,7 @@ export class Game {
         const level = LEVELS[index];
         this.level = level;
         this.grid = level.grid;
+        E.setChapterArt(level.chapter);
         this.view.build(level);
         this.world = new World(this.grid);
         this.time = resume ? resume.time : 0;
@@ -51,6 +55,8 @@ export class Game {
         this.permadeathPending = false;
         this.permadeathNotified = false;
         this.bossDamageTaken = false;
+        this.aftermath = null;
+        this.storyTimers = [];
         this.newAbilities = [];
         this.buildEntities(resume);
         this.abilities = new AbilitySystem(this, Save.equippedAbilities());
@@ -137,6 +143,7 @@ export class Game {
             }
         }
         this.setupArena();
+        this.buildStory();
         const origin = resume ? { x: resume.x, y: resume.y } : start;
         this.player = createPlayer(origin.x, origin.y);
         this.player.dashes = this.maxDashes();
@@ -160,6 +167,83 @@ export class Game {
         this.world.solids.push(this.gate);
         this.boss = createBoss(this, this.level.boss);
         if (this.goal) this.goal.mesh.visible = false;
+    }
+
+    buildStory() {
+        const d = Save.data;
+        const story = LEVEL_STORY[this.levelIndex] || { decor: [], moments: [] };
+        const ctx = { final: !!(d && d.story.scenes.final) };
+        for (const [kind, x, y] of story.decor) {
+            const mesh = makeDecor(kind, ctx);
+            mesh.position.set(x, y, -0.72);
+            this.view.root.add(mesh);
+        }
+        this.recordStones = [];
+        for (const r of RECORDS.filter(r => r.level === this.levelIndex && !r.auto)) {
+            if (d && d.story.records[r.id]) continue;
+            const mesh = makeRecordStone();
+            mesh.position.set(r.at[0], r.at[1], 0.2);
+            this.view.root.add(mesh);
+            this.recordStones.push({ id: r.id, x: r.at[0], y: r.at[1], got: false, mesh });
+        }
+        this.moments = story.moments.filter(m => !d || !d.story.moments[this.momentKey(m)]);
+    }
+
+    momentKey(m) {
+        return `${this.levelIndex}:${m.id}`;
+    }
+
+    updateStory(p, dt, cx, cy) {
+        for (let i = this.storyTimers.length - 1; i >= 0; i--) {
+            const timer = this.storyTimers[i];
+            timer.t -= dt;
+            if (timer.t <= 0) {
+                this.storyTimers.splice(i, 1);
+                this.storyLine(timer.text, timer.who);
+            }
+        }
+        for (const r of this.recordStones) {
+            if (!r.got && overlap(cx, cy, PW, PH, r.x, r.y, 1, 1.1)) this.collectRecord(r);
+        }
+        for (let i = this.moments.length - 1; i >= 0; i--) {
+            const m = this.moments[i];
+            if (p.x < m.x1 || p.x > m.x2) continue;
+            if (m.y1 !== undefined && (p.y < m.y1 || p.y > m.y2)) continue;
+            this.moments.splice(i, 1);
+            this.fireMoment(m);
+        }
+    }
+
+    fireMoment(m) {
+        Save.sawMoment(this.momentKey(m));
+        this.storyLine(m.line, m.who || 'Kael');
+        if (m.then) this.storyTimers.push({ t: 4.2, text: m.then, who: 'Kael' });
+        if (m.shake) {
+            this.shake(m.shake);
+            Sfx.pound();
+        }
+        if (m.dim) this.view.setDim(m.dim);
+        if (m.record) this.grantRecord(m.record);
+    }
+
+    storyLine(text, who, duration) {
+        if (this.hooks.onStoryLine) this.hooks.onStoryLine(text, who, duration);
+    }
+
+    collectRecord(stone) {
+        stone.got = true;
+        this.player.casting = 0.35;
+        stone.mesh.visible = false;
+        this.view.emit(stone.x, stone.y, 0x6fcfff, 26, 5, 0.8);
+        this.grantRecord(stone.id);
+        this.unlock('first_record');
+    }
+
+    grantRecord(id) {
+        if (!Save.discoverRecord(id)) return;
+        Sfx.record();
+        if (this.hooks.onRecord) this.hooks.onRecord(recordById(id));
+        if (recordsFound(Save.data) >= TOTAL_RECORDS) this.unlock('all_records');
     }
 
     hasSkill(id) {
@@ -402,6 +486,7 @@ export class Game {
         if (!p.dead) this.updateWorld(p, dt, worldDt);
         this.updateProjectiles(worldDt, p);
         this.updateBoss(p, worldDt);
+        if (this.aftermath && !this.aftermath.done) this.aftermath.update(dt);
     }
 
     touchingTileHazard(p) {
@@ -428,6 +513,7 @@ export class Game {
             this.kill('spike');
             return;
         }
+        this.updateStory(p, dt, cx, cy);
         for (const b of this.berries) {
             if (!b.got && overlap(cx, cy, PW, PH, b.x, b.y, 0.8, 0.8)) this.collectBerry(b);
         }
@@ -493,6 +579,7 @@ export class Game {
     }
 
     activateFlag(f, p) {
+        p.casting = 0.35;
         this.flags.forEach(o => { o.active = false; });
         f.active = true;
         this.spawn = { x: f.x, y: f.y };
@@ -568,6 +655,7 @@ export class Game {
 
     onEnemyKilled(e, kind, p) {
         e.die(this);
+        this.view.slash(e.x, e.y + e.h / 2, p.dashTimer > 0 ? Math.atan2(p.dashDir.y, p.dashDir.x) : -0.6, 0xfff2d0);
         this.hitstop(0.06);
         this.shake(0.4);
         Sfx.stomp();
@@ -604,6 +692,7 @@ export class Game {
     afterBossStrike(result, part, kind) {
         const p = this.player;
         if (result === 'none') return;
+        this.view.slash(p.x, p.y + PH / 2, p.dashTimer > 0 ? Math.atan2(p.dashDir.y, p.dashDir.x) : -0.6, result === 'blocked' ? 0xbfd0e0 : 0xffe2a8, result === 'blocked' ? 0.7 : 1.3);
         if (result === 'blocked') {
             this.bouncePlayerOff(p, part.x, part.y);
             return;
@@ -748,6 +837,12 @@ export class Game {
         this.hooks.onBossEnd && this.hooks.onBossEnd();
         this.unlock(this.level.boss);
         if (!this.bossDamageTaken) this.unlock('boss_nodmg');
+        const a = this.level.arena;
+        const end = this.boss.dyingPoint();
+        let restX = Math.max(a.x1 + 3, Math.min(a.x2 - 3, end.x));
+        if (this.goal && Math.abs(restX - this.goal.x) < 5) restX = this.goal.x - 6;
+        this.aftermath = createAftermath(this, this.level.boss, restX, a.floor);
+        if (!this.aftermath && this.hooks.onBossEpilogue) this.hooks.onBossEpilogue();
     }
 
     complete() {
@@ -819,6 +914,10 @@ export class Game {
             this.view.follow(this.boss.x, this.boss.y + 1, dt, false, true);
             return;
         }
+        if (this.aftermath && !this.aftermath.done) {
+            this.view.follow(this.aftermath.focus.x, this.aftermath.focus.y, dt, false, true);
+            return;
+        }
         const look = p.dead ? 0 : p.facing * Math.min(1.5, Math.abs(p.vx) * 0.2);
         this.view.follow(p.x + look, p.y, dt, false);
     }
@@ -829,13 +928,15 @@ export class Game {
         E.animatePlayer(this.playerMesh, p, playerPose(p), dt, t);
         this.abilities.sync(t);
         if (this.goal) {
-            const { ring, core } = this.goal.mesh.userData;
-            ring.rotation.y = t * 2;
-            core.rotation.y = -t * 3;
+            E.animateGoal(this.goal.mesh, t);
             this.goal.mesh.position.y = this.goal.y + Math.sin(t * 2) * 0.1;
         }
-        this.berries.forEach((b, i) => { b.mesh.position.y = b.y + Math.sin(t * 3 + i) * 0.12; b.mesh.rotation.y = t; });
-        this.crystals.forEach(c => { c.mesh.rotation.y = t * 2; });
+        this.berries.forEach((b, i) => { b.mesh.position.y = b.y + Math.sin(t * 3 + i) * 0.12; E.animateBerry(b.mesh, t, i); });
+        this.crystals.forEach(c => { E.animateCrystal(c.mesh, t); });
+        this.recordStones.forEach(r => {
+            r.mesh.position.y = r.y + Math.sin(t * 1.8) * 0.08;
+            r.mesh.userData.halo.rotation.z = t;
+        });
         this.springs.forEach(s => {
             s.anim = Math.max(0, s.anim - dt);
             s.mesh.userData.top.position.y = 0.4 + (s.anim > 0 ? 0.25 : 0);

@@ -40,6 +40,7 @@ export function fakeView() {
         setBounds() {},
         flash() {},
         setDim() {},
+        slash() {},
         damageFlash() {},
         spawnPop() {},
         updateParticles() {}

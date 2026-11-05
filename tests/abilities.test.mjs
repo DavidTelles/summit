@@ -87,7 +87,7 @@ test('migração v2: mantém recordes e checkpoint, concede habilidades pelo his
         achievements: { boss1: true }, completedChapters: [1],
         checkpoint: { level: 6, x: 10, y: 4, time: 3 }
     });
-    assert.equal(d.version, 3);
+    assert.equal(d.version, 4);
     assert.ok(d.best[5], 'recorde de fase redesenhada preservado');
     assert.deepEqual(d.checkpoint, { level: 6, x: 10, y: 4, time: 3 });
     for (const id of ['shockwave', 'energy_shield', 'long_dash', 'heal', 'perception', 'recall', 'air_burst', 'perfect_dodge', 'glide']) assert.ok(d.abilities[id], id);
