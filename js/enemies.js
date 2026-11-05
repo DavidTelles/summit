@@ -5,7 +5,7 @@ import { PH } from './config.js';
 
 const SIGHT_ROW = 1.6;
 
-class Enemy {
+export class Enemy {
     constructor(def, root, make, stats = {}) {
         Object.assign(this, { w: 0.8, h: 0.8, hp: 1, dir: -1, alive: true, state: 'idle', t: 0, hitFlash: 0, color: 0x8b2fc9 }, stats, def);
         this.ox = this.x;

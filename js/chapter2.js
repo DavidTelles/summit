@@ -98,9 +98,15 @@ function stormPeak() {
     g.fill(33, 2, 35, 2, '^');
     g.set(2, 2, 'P').set(30, 2, 'K').set(62, 6, 'K').set(101, 6, 'G');
     g.many([[22, 12], [34, 7], [55, 11]], 'S');
+    g.many([[79, 14], [91, 14]], 'C');
     return {
         name: 'Pico da Tormenta', color: 0x5a8fff, ...STORM, boss: 'boss2', grid: g,
-        arena: { x1: 66, x2: 105, floor: 6, ceil: 27, gateX: 65, triggerX: 68, spawnX: 67, entryX: 62.5, zoom: 29 },
+        arena: {
+            x1: 66, x2: 105, floor: 6, ceil: 27, gateX: 65, triggerX: 68, spawnX: 67, entryX: 62.5, zoom: 29,
+            nests: [{ x: 72, y: 22 }, { x: 85.5, y: 24 }, { x: 99, y: 22 }, { x: 78, y: 18 }, { x: 92, y: 18 }],
+            rods: [{ x: 74.5, y: 11 }, { x: 85.5, y: 12 }, { x: 96.5, y: 11 }],
+            lifts: [{ type: 'mover', x: 78, y: 8, w: 3, h: 1, dy: 8, period: 6 }, { type: 'mover', x: 90, y: 8, w: 3, h: 1, dy: 8, period: 6, phase: 0.5 }]
+        },
         objects: [
             { type: 'mover', x: 14, y: 2, w: 3, h: 1, dx: 10, dy: 3, period: 5 },
             { type: 'gust', x: 12, y: 0, w: 17, h: 18, fx: -3.5, period: 5, on: 2 },

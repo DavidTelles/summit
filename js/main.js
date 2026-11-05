@@ -157,7 +157,19 @@ const game = new Game(view, {
         $('boss-lag').style.width = ratio * 100 + '%';
         setHtml('boss-marks', marks.map(m => `<i style="left:${m * 100}%"></i>`).join(''));
     },
+    onBossStatus(text, shielded) {
+        const cue = $('boss-cue');
+        if (cue.textContent !== text) {
+            cue.textContent = text;
+            cue.classList.remove('pop');
+            void cue.offsetWidth;
+            if (text) cue.classList.add('pop');
+        }
+        $('boss-bar').classList.toggle('shielded', shielded);
+    },
     onBossEnd() {
+        $('boss-cue').textContent = '';
+        $('boss-bar').classList.remove('shielded');
         $('boss-bar').classList.add('hidden');
         showBanner('Vitória', 'Caminho livre', 'Siga até o portal.', 2400);
     },

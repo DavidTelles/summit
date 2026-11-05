@@ -377,6 +377,134 @@ export function makeGate(h) {
     return g;
 }
 
+export function makeStormOrb() {
+    const g = new THREE.Group();
+    const core = new THREE.Mesh(geo('orbCore', () => new THREE.IcosahedronGeometry(0.42, 0)), glow(0xe8f6ff, 1.5));
+    const cage = new THREE.Mesh(geo('orbCage', () => new THREE.TorusGeometry(0.62, 0.05, 6, 16)), glow(0x7fc6ff, 1.2));
+    const cageTwo = cage.clone();
+    cageTwo.rotation.y = Math.PI / 2;
+    const blast = new THREE.Mesh(geo('orbBlast', () => new THREE.TorusGeometry(1, 0.06, 6, 40)), glow(0xfff2b0, 1.2, 0.85));
+    blast.visible = false;
+    g.add(core, cage, cageTwo, blast);
+    g.userData = { core, cage, cageTwo, blast };
+    return g;
+}
+
+export function setOrbReturning(m) {
+    m.userData.core.material = glow(0xfff2b0, 1.8);
+    m.userData.cage.material = glow(0xffd23f, 1.4);
+    m.userData.cageTwo.material = glow(0xffd23f, 1.4);
+}
+
+export function setOrbVolley(m) {
+    m.userData.core.material = glow(0xffd0c0, 1.8);
+    m.userData.cage.material = glow(0xff6a5a, 1.4);
+    m.userData.cageTwo.material = glow(0xff6a5a, 1.4);
+}
+
+export function makeStormCloud() {
+    const g = new THREE.Group();
+    const puff = mat(0x46587c, { transparent: true, opacity: 0.92 });
+    const dark = mat(0x2d3a57, { transparent: true, opacity: 0.92 });
+    g.add(box(4.6, 1.5, 1.4, puff), box(2.6, 1.7, 1.6, dark, -1, 0.5, 0), box(2.4, 1.3, 1.6, puff, 1.2, 0.4, 0), box(3.2, 0.7, 1.2, dark, 0, -0.7, 0));
+    const gleam = new THREE.Mesh(boxGeo(1.2, 0.6, 1.8), glow(0xfff2b0, 1.6));
+    gleam.visible = false;
+    g.add(gleam);
+    g.userData = { gleam };
+    return g;
+}
+
+export function makeStormPlate(w) {
+    const g = new THREE.Group();
+    const strip = box(w - 0.4, 0.12, 1.5, mat(0x5a6d90), 0, 0.06, 0);
+    strip.castShadow = false;
+    g.add(strip);
+    const seams = [-w / 2 + 0.5, w / 2 - 0.5].map(x => box(0.14, 0.2, 1.6, glow(0x7fc6ff, 0.6), x, 0.1, 0));
+    g.add(...seams);
+    return g;
+}
+
+export function makeStormRod() {
+    const g = new THREE.Group();
+    g.add(box(0.8, 0.3, 0.8, mat(0x4f5667), 0, 0.15, 0), box(0.2, 2, 0.2, mat(0x8a93a6), 0, 1.15, 0));
+    const tipOff = mat(0x8a93a6);
+    const tipOn = glow(0xffe08a, 1.6);
+    const tip = box(0.5, 0.5, 0.5, tipOff, 0, 2.3, 0);
+    tip.rotation.z = Math.PI / 4;
+    g.add(tip);
+    g.userData = { tip, tipOff, tipOn };
+    return g;
+}
+
+export function makeAimLine(color) {
+    const line = new THREE.Mesh(boxGeo(1, 0.14, 0.14), glow(color, 1.2, 0.75));
+    line.visible = false;
+    return line;
+}
+
+export function setAimLine(line, x1, y1, x2, y2, width = 1) {
+    const len = Math.hypot(x2 - x1, y2 - y1) || 0.01;
+    line.position.set((x1 + x2) / 2, (y1 + y2) / 2, 0.6);
+    line.rotation.z = Math.atan2(y2 - y1, x2 - x1);
+    line.scale.set(len, width, width);
+    line.visible = true;
+}
+
+export function makeBossSlab(w, h) {
+    const g = new THREE.Group();
+    g.add(box(w - 0.04, h, 2, mat(0x5e2a2a), 0, 0, 0));
+    const cap = box(w, 0.24, 2.12, mat(0x4c2a26), 0, h / 2 - 0.1, 0);
+    cap.castShadow = false;
+    g.add(cap);
+    const off = mat(0x3a1a18);
+    const hot = glow(0xff8a3c, 1.2);
+    const veins = [-w / 3, 0, w / 3].map((x, i) => box(0.16, h * 0.8, 2.14, off, x, -0.05, 0));
+    g.add(...veins);
+    g.userData = { veins, off, hot };
+    return g;
+}
+
+export function setSlabHot(m, hot) {
+    const u = m.userData;
+    const material = hot ? u.hot : u.off;
+    if (u.veins[0].material !== material) u.veins.forEach(v => { v.material = material; });
+}
+
+export function makeMagmaPylon() {
+    const g = new THREE.Group();
+    g.add(box(1.4, 0.4, 1.4, mat(0x3b3238), 0, 0.2, 0));
+    const crystal = box(0.9, 1.7, 0.9, glow(0xff8a3c, 1.1), 0, 1.25, 0);
+    crystal.rotation.y = Math.PI / 4;
+    g.add(crystal);
+    g.userData = { crystal };
+    return g;
+}
+
+export function makeSealPad() {
+    const g = new THREE.Group();
+    g.add(box(2.4, 0.2, 1.5, mat(0x3b3238), 0, 0.1, 0));
+    const offMat = glow(0xc89bff, 1, 0.9);
+    const onMat = glow(0x7dffa8, 1.4);
+    const rune = box(1.5, 0.12, 1.6, offMat, 0, 0.26, 0);
+    g.add(rune);
+    g.userData = { rune, offMat, onMat };
+    return g;
+}
+
+export function makeMagmite(kind) {
+    const g = new THREE.Group();
+    const shell = mat(kind === 'feeder' ? 0x8f5a2c : 0x4a3a3a);
+    const glowMat = glow(kind === 'feeder' ? 0x7dffa8 : 0xff8a3c, 1.1);
+    const body = box(0.9, 0.8, 0.9, shell, 0, 0.5, 0);
+    body.add(box(0.5, 0.16, 0.2, glowMat, 0.1, 0.1, 0.46));
+    body.add(box(0.5, 0.16, 0.2, glowMat, 0.1, 0.1, -0.46));
+    if (kind === 'guard') body.add(box(1.1, 0.3, 1.1, mat(0x2b2428), 0, 0.5, 0));
+    if (kind === 'feeder') body.add(box(0.5, 0.5, 0.5, glowMat, 0, 0.55, 0));
+    g.add(body);
+    g.userData = { magmite: body };
+    return g;
+}
+
 export function makeSigil() {
     const g = new THREE.Group();
     const m = glow(0xc89bff, 1.1);
@@ -590,6 +718,14 @@ export function makeRamBoss() {
 
 export function makeStormBoss() {
     const g = new THREE.Group();
+    const shroud = new THREE.Mesh(geo('stormShroud', () => new THREE.IcosahedronGeometry(2.9, 1)), glow(0x6f8fc4, 0.5, 0.3));
+    shroud.position.y = 1.7;
+    const shroudTwo = new THREE.Mesh(geo('stormShroudTwo', () => new THREE.IcosahedronGeometry(3.4, 0)), glow(0xbfe0ff, 0.9, 0.22));
+    shroudTwo.position.y = 1.7;
+    const chargeGlow = new THREE.Mesh(geo('stormCharge', () => new THREE.SphereGeometry(0.55, 12, 10)), glow(0xffffff, 1.4, 0.85));
+    chargeGlow.position.set(0, 1.7, 1.25);
+    chargeGlow.visible = false;
+    g.add(shroud, shroudTwo, chargeGlow);
     const cloud = mat(0x394a6b);
     const ring = new THREE.Group();
     for (let i = 0; i < 9; i++) {
@@ -612,7 +748,7 @@ export function makeStormBoss() {
     const eye = pivot(0, 0, 0, iris, pupil);
     const rig = pivot(0, 1.7, 0, ring, rods, eye, lidTop, lidBottom);
     g.add(rig);
-    g.userData = { rig, ring, rods, lidTop, lidBottom, pupil, irisMat };
+    g.userData = { rig, ring, rods, lidTop, lidBottom, pupil, irisMat, shroud, shroudTwo, chargeGlow };
     return g;
 }
 
@@ -646,8 +782,16 @@ export function makeColossus() {
     );
     const handL = hand();
     const handR = hand();
-    g.add(head, handL, handR);
-    g.userData = { head, handL, handR, faceMat };
+    const shield = new THREE.Mesh(geo('magmaShield', () => new THREE.IcosahedronGeometry(3.4, 1)), glow(0xff7a2a, 0.9, 0.3));
+    shield.position.y = 1.8;
+    const coreGlow = new THREE.Mesh(geo('magmaCore', () => new THREE.SphereGeometry(1.1, 12, 10)), glow(0xffe08a, 1.6, 0.9));
+    coreGlow.position.set(0, 1.4, 1.5);
+    coreGlow.visible = false;
+    const novaRing = new THREE.Mesh(geo('novaRing', () => new THREE.TorusGeometry(1, 0.1, 6, 48)), glow(0xffb060, 1.2, 0.8));
+    novaRing.visible = false;
+    novaRing.position.y = 1.8;
+    g.add(head, handL, handR, shield, coreGlow, novaRing);
+    g.userData = { head, handL, handR, faceMat, shield, coreGlow, novaRing };
     return g;
 }
 
@@ -675,17 +819,31 @@ export function animateBoss(m, b, t) {
     if (u.rig) {
         u.ring.rotation.z = t * (b.phase > 0 ? 1.8 : 1);
         u.rods.rotation.z = -t * 1.4;
-        const open = b.vulnerable ? 1 : b.act === 'descend' ? 0.5 : 0.14;
+        const open = b.eyeOpen();
         u.lidTop.position.y += (0.6 + open * 1.05 - u.lidTop.position.y) * 0.18;
         u.lidBottom.position.y += (-0.6 - open * 1.05 - u.lidBottom.position.y) * 0.18;
         const p = b.game.player;
         u.pupil.position.x = Math.max(-0.5, Math.min(0.5, (p.x - b.x) * 0.06));
         u.pupil.position.y = Math.max(-0.4, Math.min(0.4, (p.y - b.y) * 0.05));
-        u.irisMat.emissive.setHex(b.phase > 0 ? 0xffb080 : 0x9fd0ff);
+        u.irisMat.emissive.setHex(b.phase > 1 ? 0xff6a5a : b.phase > 0 ? 0xffb080 : 0x9fd0ff);
         u.irisMat.emissiveIntensity = flash ? 3 : b.vulnerable ? 1.5 : 0.8;
+        u.shroud.visible = b.shroud >= 1 && !b.vulnerable;
+        u.shroudTwo.visible = b.shroud >= 2 && !b.vulnerable;
+        u.shroud.rotation.y = t * 0.8;
+        u.shroudTwo.rotation.x = -t * 1.2;
+        u.chargeGlow.visible = b.charging > 0;
+        u.chargeGlow.scale.setScalar(0.4 + b.charging * 1.5 + Math.sin(t * 40) * 0.08);
+        u.rig.rotation.z = b.act === 'lodged' || b.act === 'grounded' ? Math.sin(t * 22) * 0.06 : b.act === 'dive' ? 0.5 * Math.sign(b.diveX || 1) : 0;
     }
     if (u.faceMat) {
-        u.head.rotation.z = b.act === 'staggered' ? Math.sin(t * 18) * 0.05 + 0.1 : Math.sin(t) * 0.03;
-        u.faceMat.emissiveIntensity = flash ? 3.5 : b.vulnerable ? 2 + Math.sin(t * 14) * 0.6 : 0.5 + b.phase * 0.3;
+        u.head.rotation.z = b.act === 'staggered' ? Math.sin(t * 18) * 0.05 + 0.1 : b.act === 'transition' ? Math.sin(t * 26) * 0.05 : Math.sin(t) * 0.03;
+        u.faceMat.emissiveIntensity = flash ? 3.5 : b.vulnerable ? 2 + Math.sin(t * 14) * 0.6 : 0.5 + b.phase * 0.3 + (b.heat || 0) * 0.35;
+        u.shield.visible = b.shielded && !b.vulnerable;
+        u.shield.rotation.y = t * 0.6;
+        u.shield.scale.setScalar(1 + Math.sin(t * 5) * 0.03);
+        u.coreGlow.visible = b.vulnerable;
+        u.coreGlow.scale.setScalar(0.85 + Math.sin(t * 12) * 0.15);
+        u.novaRing.visible = b.novaR > 0;
+        u.novaRing.scale.setScalar(Math.max(0.01, b.novaR || 0));
     }
 }

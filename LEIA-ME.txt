@@ -27,6 +27,8 @@ sempre ativos e nao ocupam espaco: as fases foram desenhadas para exigi-los.
 TESTES (Node 22, sem instalar nada)
   node --test tests/gameplay.test.mjs     regras, saves, chefes, fases
   node --test tests/abilities.test.mjs    habilidades, selecao, evolucao, isolamento
+  node --test tests/bosses.test.mjs       chefes dos cap. 2 e 3, cap. 1 intacto, bots que vencem cada chefe
+  node tests/bossBot.mjs                  relatorio dos bots: tempo, mortes e golpes por loadout
   node tests/solver.mjs                   prova que cada fase pode ser concluida
   node tests/solver.mjs 6,7 --berries     idem, incluindo os morangos
   node tests/browser.mjs                  navegador real, com capturas de tela

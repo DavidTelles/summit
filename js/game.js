@@ -9,7 +9,7 @@ import { World } from './world.js';
 import { createPlayer, resetPlayerMotion, updatePlayer, playerPose } from './player.js';
 import { createHazard, isHazardDef, overlap } from './hazards.js';
 import { createEnemy, isEnemyDef } from './enemies.js';
-import { createBoss } from './bosses.js';
+import { createBoss } from './bossRoster.js';
 
 const COMPLETE_DELAY = 0.9;
 const CRUMBLE_DELAY = 0.35;
@@ -674,6 +674,7 @@ export class Game {
         for (const list of [this.shots, this.strikes]) {
             for (let i = list.length - 1; i >= 0; i--) {
                 const item = list[i];
+                if (!item) continue;
                 item.update(this, dt, p);
                 if (item.done) {
                     item.dispose(this);
@@ -706,12 +707,16 @@ export class Game {
         this.view.setBounds({ x1: a.x1, x2: a.x2, y1: a.floor - 2, y2: a.ceil, dist: a.zoom || 25 });
         b.begin();
         this.hooks.onBossIntro && this.hooks.onBossIntro(b.name, b.title);
-        Sfx.setTheme('boss');
+        Sfx.setTheme(b.theme || 'boss');
     }
 
     bossFightStarted() {
         this.cutscene = false;
         this.bossBarChanged();
+    }
+
+    bossStatus(text, shielded = false) {
+        this.hooks.onBossStatus && this.hooks.onBossStatus(text, shielded);
     }
 
     bossBarChanged() {

@@ -39,6 +39,7 @@ export function fakeView() {
         follow() {},
         setBounds() {},
         flash() {},
+        setDim() {},
         damageFlash() {},
         spawnPop() {},
         updateParticles() {}

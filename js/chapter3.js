@@ -87,10 +87,10 @@ function eternal() {
     g.fill(32, 16, 34, 40, '#').fill(26, 26, 31, 26, '^');
     g.fill(42, 18, 46, 18, '#').fill(52, 14, 54, 14, 'Y').fill(50, 14, 51, 14, '#').fill(55, 14, 56, 14, '#');
     pulseWalk(g, 58, 72, 16, 3);
-    g.fill(74, 18, 131, 19, '#');
+    g.fill(74, 18, 89, 19, '#').fill(119, 18, 131, 19, '#');
     g.fill(123, 20, 131, 44, '#').fill(84, 44, 131, 45, '#');
-    g.fill(90, 24, 95, 24, '#').fill(100, 24, 105, 24, '#').fill(112, 24, 117, 24, '#');
     g.fill(97, 30, 99, 30, '#').fill(108, 30, 110, 30, '#');
+    g.many([[96, 27], [111, 27]], 'C');
     g.fill(46, 4, 58, 5, '#').fill(46, 6, 46, 13, '#').fill(58, 6, 58, 13, '#');
     g.set(49, 6, 'B');
     g.set(2, 2, 'P').set(43, 19, 'K').set(77, 20, 'K').set(118, 20, 'G');
@@ -101,7 +101,24 @@ function eternal() {
         name: 'Cume Eterno', color: 0xff5a5a, ...CORE, boss: 'boss3', grid: g,
         arena: {
             x1: 85, x2: 123, floor: 20, ceil: 44, gateX: 84, triggerX: 87, spawnX: 86, entryX: 77.5, zoom: 30,
-            sigils: [{ x: 92.5, y: 25 }, { x: 102.5, y: 25 }, { x: 114.5, y: 25 }]
+            safe: { x: 103, y: 25 },
+            slabs: [
+                { kind: 'floor', x: 90, y: 18, w: 6, h: 2 }, { kind: 'floor', x: 96, y: 18, w: 6, h: 2 },
+                { kind: 'floor', x: 102, y: 18, w: 6, h: 2 }, { kind: 'floor', x: 108, y: 18, w: 6, h: 2 },
+                { kind: 'floor', x: 114, y: 18, w: 5, h: 2 },
+                { kind: 'ledge', x: 90, y: 24, w: 6, h: 1 }, { kind: 'ledge', x: 100, y: 24, w: 6, h: 1 },
+                { kind: 'ledge', x: 112, y: 24, w: 6, h: 1 }
+            ],
+            pylons: [
+                { x: 93, y: 20, spots: { low: { x: 93, y: 20 }, high: { x: 92.5, y: 25 }, vents: { x: 92, y: 25 } } },
+                { x: 104, y: 20, spots: { low: { x: 104, y: 20 }, high: { x: 104, y: 20 } } },
+                { x: 115, y: 20, spots: { low: { x: 115, y: 20 }, high: { x: 115, y: 25 }, vents: { x: 116, y: 25 } } }
+            ],
+            pads: [{ x: 93, y: 25 }, { x: 115, y: 25 }],
+            lifts: [
+                { type: 'mover', x: 86, y: 24, w: 3, h: 1, dy: 8, period: 7 },
+                { type: 'mover', x: 119, y: 24, w: 3, h: 1, dy: 8, period: 7, phase: 0.5 }
+            ]
         },
         objects: [
             { type: 'firebar', x: 23, y: 16, len: 3.2, speed: 1.6 },

@@ -163,11 +163,19 @@ for (const [level, label] of [[4, '14-chefe1'], [8, '15-chefe2'], [11, '16-chefe
     await evaluate(`(() => { const G = __summit.game; delete G.hurtPlayer; delete G.kill; G.load(${level}); G.hurtPlayer = () => {}; G.kill = () => {}; const a = G.level.arena; G.player.x = a.triggerX + 1; G.player.y = a.floor + 0.2; })()`);
     await wait(1200);
     await shot(label + '-intro');
-    await wait(4500);
+    for (let i = 0; i < 80 && !(await evaluate(`__summit.game.boss.mode === 'fight'`)); i++) await wait(250);
     check(`${label}: batalha ativa, barra visível`, await evaluate(`__summit.game.boss.mode === 'fight' && ${visible('boss-bar')}`));
+    console.log(`FPS ${label}: ${(await frameTimes(1500))?.toFixed(1)}`);
     await shot(label + '-luta');
     await wait(4000);
     await shot(label + '-ataque');
+    if (level === 4) continue;
+    for (const phase of [1, 2]) {
+        await evaluate(`(() => { const b = __summit.game.boss; while (b.phase < ${phase}) { b.vulnerable = true; b.invuln = 0; b.damage(); } })()`);
+        await wait(9000);
+        check(`${label}: fase ${phase + 1} sem travar`, await evaluate(`__summit.game.boss.phase === ${phase} && __summit.game.boss.mode === 'fight'`));
+        await shot(`${label}-fase${phase + 1}`);
+    }
 }
 
 await evaluate(`(() => { const G = __summit.game; for (let i = 0; i < 30; i++) G.load(5); })()`);

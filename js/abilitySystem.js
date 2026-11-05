@@ -68,6 +68,9 @@ class Lance {
                 this.sys.hitEnemy(e, 'ability');
             }
         }
+        for (const shot of game.shots) {
+            if (shot.deflect && Math.hypot(shot.x - this.x, shot.y - this.y) < 0.9) shot.deflect();
+        }
         if (!this.hit.has('boss')) {
             const struck = this.sys.hitBoss(part => rectNear(part, this.x, this.y, 0.25));
             if (struck) this.hit.add('boss');
@@ -400,6 +403,7 @@ export class AbilitySystem {
 
     clearShots(x, y, r) {
         for (const shot of this.game.shots) {
+            if (shot.deflect && Math.hypot(shot.x - x, shot.y - y) <= r) shot.deflect();
             if (!shot.breakable || Math.hypot(shot.x - x, shot.y - y) > r) continue;
             shot.done = true;
             this.game.view.emit(shot.x, shot.y, shot.color, 6, 3, 0.3);

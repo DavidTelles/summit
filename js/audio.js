@@ -4,9 +4,11 @@ const CHORDS = {
     1: [[220, 277, 330], [196, 247, 294], [175, 220, 262], [196, 247, 330]],
     2: [[147, 175, 220], [131, 165, 196], [117, 147, 175], [139, 165, 208]],
     3: [[110, 131, 165], [104, 131, 156], [98, 123, 147], [92, 117, 139]],
-    boss: [[110, 131, 165], [117, 139, 175], [98, 123, 147], [104, 131, 156]]
+    boss: [[110, 131, 165], [117, 139, 175], [98, 123, 147], [104, 131, 156]],
+    boss2: [[147, 175, 233], [139, 165, 220], [131, 165, 196], [156, 185, 233]],
+    boss3: [[55, 82, 110], [52, 78, 104], [49, 73, 98], [58, 87, 117]]
 };
-const BEAT = { 1: 2.4, 2: 2.0, 3: 1.7, boss: 0.46 };
+const BEAT = { 1: 2.4, 2: 2.0, 3: 1.7, boss: 0.46, boss2: 0.34, boss3: 0.58 };
 const LOOKAHEAD = 0.5;
 
 export const Sfx = {
@@ -119,6 +121,20 @@ export const Sfx = {
             if (this.bar % 8 === 6) this.tone(root[2] * 2, beat * 1.6, 'square', 0.025, 0, delay, this.musicBus);
             return;
         }
+        if (this.theme === 'boss2') {
+            const root = chords[Math.floor(this.bar / 12) % chords.length];
+            this.tone(root[this.bar % 3] * 2, beat * 0.7, 'triangle', 0.04, 0, delay, this.musicBus);
+            if (this.bar % 3 === 0) this.tone(root[0] / 2, beat * 1.4, 'sawtooth', 0.05, 0, delay, this.musicBus);
+            if (this.bar % 24 === 22) this.noise(1.1, 220, 0.12, 0.5, 60, delay);
+            return;
+        }
+        if (this.theme === 'boss3') {
+            const root = chords[Math.floor(this.bar / 8) % chords.length];
+            root.forEach(f => this.tone(f, beat * 1.3, 'sawtooth', 0.045, 0, delay, this.musicBus));
+            if (this.bar % 2 === 0) this.tone(42, 0.34, 'sine', 0.38, -10, delay, this.musicBus);
+            if (this.bar % 4 === 3) this.tone(34, 0.26, 'sine', 0.3, -6, delay, this.musicBus);
+            return;
+        }
         const chord = chords[this.bar % chords.length];
         chord.forEach(f => this.tone(f, beat * 1.5, 'sine', 0.06, 0, delay, this.musicBus));
         const note = chord[(this.bar * 2) % 3] * 2;
@@ -165,6 +181,19 @@ export const Sfx = {
     roar() { this.tone(90, 1.1, 'sawtooth', 0.16, -40); this.noise(1.0, 400, 0.2, 0.5, 150); },
     bossHit() { this.tone(160, 0.2, 'square', 0.14, -80); this.noise(0.18, 2000, 0.16); },
     bossDown() { this.roar(); [0.2, 0.5, 0.8, 1.1].forEach(d => this.noise(0.5, 300, 0.25, 0.5, 60, d)); },
+    orbCharge() { this.tone(220, 0.9, 'sine', 0.09, 900); this.noise(0.8, 700, 0.05, 0.6, 3600); },
+    orbReflect() { this.tone(1200, 0.2, 'square', 0.08, 900); this.noise(0.14, 4200, 0.1); },
+    orbBlast() { this.noise(0.4, 1400, 0.2, 0.5, 200); this.tone(260, 0.3, 'sawtooth', 0.08, -150); },
+    plateCharge() { this.tone(110, 1.0, 'sawtooth', 0.05, 700); },
+    vanish() { this.noise(0.5, 2400, 0.08, 0.7, 300); this.tone(900, 0.35, 'sine', 0.05, -700); },
+    emerge() { this.tone(300, 0.4, 'sawtooth', 0.07, 900); },
+    shroudBreak() { [1500, 1000, 700].forEach((f, i) => this.tone(f, 0.16, 'square', 0.06, -200, i * 0.05)); this.noise(0.3, 3000, 0.14); },
+    rod() { this.tone(880, 0.5, 'triangle', 0.08, 880); },
+    nova() { this.tone(70, 0.9, 'sawtooth', 0.14, 240); },
+    crack() { this.noise(0.5, 500, 0.16, 0.7, 1400); this.tone(70, 0.3, 'square', 0.08, -20); },
+    seal() { [392, 587].forEach((f, i) => this.tone(f, 0.3, 'square', 0.06, 0, i * 0.1)); this.tone(90, 0.3, 'sine', 0.2, -30); },
+    vent() { this.noise(0.8, 2600, 0.14, 0.5, 300); },
+    overheat() { [220, 277, 330, 440].forEach((f, i) => this.tone(f, 0.25, 'sawtooth', 0.06, 0, i * 0.09)); },
     denied() { this.tone(170, 0.09, 'square', 0.05, -40); },
     wave() { this.tone(120, 0.35, 'sine', 0.2, 260); this.noise(0.3, 800, 0.12, 0.6, 2600); },
     lance() { this.tone(1500, 0.16, 'sawtooth', 0.04, -900); this.noise(0.1, 4000, 0.05); },

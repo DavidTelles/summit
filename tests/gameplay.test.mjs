@@ -268,10 +268,15 @@ for (const [index, name] of [[4, 'Caçador do Pico'], [8, 'Olho da Tempestade'],
             game.player.y = a.floor + 25;
             game.player.vy = 0;
             game.player.dashTimer = 0;
-            if (b.sigil) b.onPound(b.sigil.x, b.sigil.y);
-            if (b.hands) {
-                const stuck = b.hands.find(h => h.state === 'stuck');
-                if (stuck) b.onStrike({ id: 'hand', hand: stuck }, 'stomp');
+            for (const orb of game.shots) if (orb.deflect) orb.deflect();
+            if (b.pylons) {
+                for (const m of b.minions) if (m.alive && m.kind === 'guard') m.die(game);
+                if (b.fighting) {
+                    for (const part of b.parts()) {
+                        if (part.id === 'pylon' || part.id === 'pad') b.onStrike(part, 'dash');
+                    }
+                    if (b.phase === 2) b.addHeat(1);
+                }
             }
             if (b.vulnerable && !wasVulnerable) windows++;
             wasVulnerable = b.vulnerable;

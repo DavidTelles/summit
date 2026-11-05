@@ -9,8 +9,8 @@ export const CHAPTER_DESC = {
 };
 export const BOSSES = {
     boss1: { name: 'Caçador do Pico', chapter: 1 },
-    boss2: { name: 'Olho da Tempestade', chapter: 2 },
-    boss3: { name: 'Guardião do Cume', chapter: 3 }
+    boss2: { name: 'Olho da Tempestade', chapter: 2, tip: 'Dica: golpes e habilidades devolvem as esferas de raio ao Olho.' },
+    boss3: { name: 'Guardião do Cume', chapter: 3, tip: 'Dica: ele só sofre dano sem o escudo. Destrua o que o sustenta e leve mobilidade.' }
 };
 export const DIFFICULTY = ['Tranquila', 'Moderada', 'Difícil', 'Muito difícil', 'Extrema'];
 
@@ -23,10 +23,10 @@ const LEVEL_INFO = [
     { desc: 'Rajadas de vento mudam cada salto. Investidores e raios protegem o vale.', difficulty: 3 },
     { desc: 'Plataformas móveis sobre o vazio. Escudos só caem por trás ou por cima.', difficulty: 3 },
     { desc: 'Uma descida guiada pelo vento, com raios frequentes e predadores aéreos.', difficulty: 4 },
-    { desc: 'O topo da tempestade. O Olho observa cada movimento e o chão não é seguro.', difficulty: 4 },
+    { desc: 'O topo da tempestade. O Olho caça das nuvens e só cai se você devolver seus raios.', difficulty: 4 },
     { desc: 'Lava que sobe, gêiseres e barras de fogo. Parar significa queimar.', difficulty: 4 },
     { desc: 'Uma subida vertical pelo interior da montanha, com sentinelas e lava constante.', difficulty: 5 },
-    { desc: 'O último trecho. A própria montanha se levanta para impedir sua chegada.', difficulty: 5 }
+    { desc: 'O último trecho. O chão desaba, a lava sobe e a própria montanha tenta impedir sua chegada.', difficulty: 5 }
 ];
 
 const ENEMY_TYPES = new Set(['charger', 'spitter', 'shield', 'diver', 'sentinel']);
@@ -95,6 +95,7 @@ export function levelObjectives(index) {
     const f = facts[index];
     const list = [];
     if (f.boss) list.push({ icon: 'boss', text: `Derrote ${BOSSES[f.boss].name}` });
+    if (f.boss && BOSSES[f.boss].tip) list.push({ icon: 'eye', text: BOSSES[f.boss].tip });
     list.push({ icon: 'flag', text: 'Alcance o portal no fim da fase' });
     list.push({ icon: 'berry', text: `Opcional: colete ${f.berries} morangos` });
     if (f.secrets) list.push({ icon: 'eye', text: 'Opcional: encontre a área secreta' });

@@ -60,6 +60,8 @@ export class View {
         this.targetDist = CAMERA_DIST;
         this.bounds = null;
         this.flashAmount = 0;
+        this.dim = 1;
+        this.dimTarget = 1;
         this.popTimer = 0;
         this.idleT = 0;
         this.root = new THREE.Group();
@@ -148,6 +150,8 @@ export class View {
         this.level = level;
         this.bounds = null;
         this.targetDist = CAMERA_DIST;
+        this.dim = 1;
+        this.dimTarget = 1;
         const base = new THREE.Color(level.color);
         const chapterDark = level.chapter === 1 ? 0.62 : level.chapter === 2 ? 0.32 : 0.22;
         const fogColor = base.clone().multiplyScalar(chapterDark);
@@ -157,6 +161,7 @@ export class View {
         this.hemi.intensity = level.chapter === 1 ? 1.5 : level.chapter === 2 ? 1.15 : 1.0;
         this.sun.intensity = level.chapter === 1 ? 2.4 : level.chapter === 2 ? 1.5 : 1.7;
         this.sun.color.setHex(level.chapter === 3 ? 0xffb080 : level.chapter === 2 ? 0xbcd2ff : 0xfff4e0);
+        this.sunBase = this.sun.intensity;
         this.renderer.shadowMap.enabled = Settings.shadows;
         this.sun.castShadow = Settings.shadows;
         this.buildTerrain(level);
@@ -330,6 +335,10 @@ export class View {
         this.flashAmount = Math.max(this.flashAmount, amount);
     }
 
+    setDim(amount) {
+        this.dimTarget = amount;
+    }
+
     damageFlash() {
         if (!this.flashEl) return;
         this.flashEl.classList.remove('on');
@@ -375,7 +384,9 @@ export class View {
         this.flashAmount = Math.max(0, this.flashAmount - dt * 3);
         this.skyMaterial.uniforms.flash.value = this.flashAmount;
         const base = this.level.chapter === 1 ? 1.5 : this.level.chapter === 2 ? 1.15 : 1.0;
-        this.hemi.intensity = base + this.flashAmount * 2.2;
+        this.dim += (this.dimTarget - this.dim) * Math.min(1, dt * 1.5);
+        this.hemi.intensity = base * this.dim + this.flashAmount * 2.2;
+        this.sun.intensity = this.sunBase * this.dim;
     }
 
     idle(dt) {

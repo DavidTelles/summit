@@ -83,6 +83,11 @@ html, body {
 #boss-fill, #boss-lag { position: absolute; left: 0; top: 0; bottom: 0; }
 #boss-fill { background: linear-gradient(#ff7a5c, #d81e3f); transition: width 0.12s; }
 #boss-lag { background: #fff0b0; transition: width 0.7s 0.15s; }
+#boss-cue { min-height: 18px; margin-bottom: 6px; font-size: 14px; color: #ffe9a8; text-shadow: 0 2px 3px #000; }
+#boss-cue.pop { animation: cue-pop 0.4s ease-out; }
+#boss-bar.shielded #boss-fill { background: linear-gradient(#8fa6c8, #4c5f80); }
+#boss-bar.shielded .boss-track { border-color: #9fd0ff; }
+@keyframes cue-pop { from { opacity: 0; transform: translateY(8px) scale(1.08); } }
 #boss-marks i { position: absolute; top: -2px; bottom: -2px; width: 2px; background: #fff; }
 @keyframes rise { from { opacity: 0; transform: translate(-50%, 16px); } }
 
