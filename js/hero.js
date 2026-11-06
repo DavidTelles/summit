@@ -47,11 +47,55 @@ export class HeroStage {
         }
         this.model = E.makePlayer();
         this.model.userData.halo.scale.setScalar(0.001);
+        this.yaw = 0;
+        this.spinV = 0;
+        this.dragX = null;
+        canvas.tabIndex = 0;
+        canvas.setAttribute('role', 'img');
+        canvas.addEventListener('pointerdown', e => {
+            this.dragX = e.clientX;
+            this.spinV = 0;
+            canvas.setPointerCapture(e.pointerId);
+            canvas.classList.add('dragging');
+        });
+        canvas.addEventListener('pointermove', e => {
+            if (this.dragX === null) return;
+            const dx = e.clientX - this.dragX;
+            this.dragX = e.clientX;
+            this.yaw += dx * 0.012;
+            this.spinV = dx * 0.012 * 60;
+        });
+        const release = () => {
+            this.dragX = null;
+            canvas.classList.remove('dragging');
+        };
+        canvas.addEventListener('pointerup', release);
+        canvas.addEventListener('pointercancel', release);
+        canvas.addEventListener('keydown', e => {
+            if (e.code !== 'ArrowLeft' && e.code !== 'ArrowRight') return;
+            e.preventDefault();
+            e.stopPropagation();
+            this.spinV += e.code === 'ArrowLeft' ? -5 : 5;
+        });
         this.scene.add(this.model);
         this.pose = { x: 0, y: 0, vx: 0, vy: 0, facing: 1, dashes: 1, dashDir: { x: 1, y: 0 }, squash: 1, onGround: true, climbing: 0, iframes: 0, dead: false };
         this.t = 0;
         this.width = 0;
         this.height = 0;
+    }
+
+    frame(close) {
+        if (close) this.camera.position.set(0, 0.78, 3.7);
+        else this.camera.position.set(0, 0.5, 5.2);
+        this.camera.lookAt(0, close ? 0.62 : 0.5, 0);
+        if (!close) {
+            this.yaw = 0;
+            this.spinV = 0;
+        }
+    }
+
+    setSkin(id) {
+        E.setPlayerSkin(this.model, id);
     }
 
     setChapter(chapter) {
@@ -72,6 +116,11 @@ export class HeroStage {
     update(dt) {
         this.resize();
         this.t += dt;
+        if (this.dragX === null) {
+            this.yaw += this.spinV * dt;
+            this.spinV *= Math.pow(0.04, dt);
+        }
+        this.model.rotation.y = this.yaw;
         E.animatePlayer(this.model, this.pose, 'idle', dt, this.t);
         this.renderer.render(this.scene, this.camera);
     }

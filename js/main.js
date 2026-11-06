@@ -8,6 +8,7 @@ import { Sfx } from './audio.js';
 import { icon } from './icons.js';
 import { createHub, fmtLong, fmtTime as fmt } from './hub.js';
 import { HeroStage } from './hero.js';
+import { SKINS, skinById } from './skins.js';
 import { Cinema } from './cinema.js';
 import { SCENE_AFTER_LEVEL, pendingScene } from './story.js';
 
@@ -231,9 +232,75 @@ const hub = createHub({
     start,
     currentScreen: () => currentScreen,
     mountSettings,
-    createHero: canvas => new HeroStage(canvas),
+    createHero: () => heroStage(),
     replayScene: id => playScene(id, () => enterHub('records'), true)
 });
+
+let heroInstance = null;
+let heroTried = false;
+let savesFocus = 0;
+
+function heroStage() {
+    if (!heroTried) {
+        heroTried = true;
+        try {
+            heroInstance = new HeroStage($('hero'));
+        } catch (e) {
+            heroInstance = null;
+        }
+    }
+    return heroInstance;
+}
+
+function swatch(skin) {
+    return `background: linear-gradient(135deg, ${skin.swatch[0]} 0 55%, ${skin.swatch[1]} 55% 100%)`;
+}
+
+function renderShowcase() {
+    const s = Save.slot(savesFocus);
+    const owned = s ? s.skins.unlocked : ['original'];
+    const equipped = s ? s.skins.equipped : 'original';
+    const skin = skinById(equipped);
+    const hero = heroStage();
+    const stage = $('showcase-stage');
+    if (hero) {
+        stage.prepend($('hero'));
+        $('hero').classList.remove('hidden');
+        $('hero').setAttribute('aria-label', `Protagonista com a skin ${skin.name}. Arraste ou use as setas para girar.`);
+        hero.setSkin(equipped);
+        hero.frame(true);
+        hero.setChapter(s ? levelFacts(continueLevel(s)).chapter : 1);
+    }
+    stage.classList.toggle('no-hero', !hero);
+    $('showcase-slot').textContent = s ? `Campanha ${savesFocus + 1} · ${owned.length}/${SKINS.length} skins` : `Campanha ${savesFocus + 1} · slot vazio`;
+    $('showcase-name').textContent = skin.name;
+    $('showcase-note').textContent = skin.note;
+    $('showcase-skins').innerHTML = SKINS.map(k => {
+        const have = owned.includes(k.id);
+        const on = k.id === equipped;
+        const req = k.chapter ? `Conclua o Capítulo ${k.chapter} inteiro sem morrer.` : 'Inicial';
+        return `<button class="skin-chip${have ? '' : ' locked'}${on ? ' equipped' : ''}" data-act="equip-skin" data-arg="${k.id}" ${have && s ? '' : 'aria-disabled="true"'} aria-pressed="${on}" title="${have ? k.name : 'Bloqueada: ' + req}">
+            <i class="skin-swatch" style="${swatch(k)}">${have ? '' : icon('lock')}</i><span><b>${k.name}</b><small>${on ? 'Equipada' : have ? 'Liberada' : 'Bloqueada'}</small></span></button>`;
+    }).join('');
+    $('showcase-skins').querySelectorAll('.skin-chip').forEach(chip => {
+        const k = skinById(chip.dataset.arg);
+        const preview = () => {
+            $('showcase-note').textContent = owned.includes(k.id) ? `${k.name}: ${k.note}` : `${k.name} bloqueada. Conclua o Capítulo ${k.chapter} inteiro sem morrer.`;
+        };
+        const restore = () => { $('showcase-note').textContent = skin.note; };
+        chip.addEventListener('pointerenter', preview);
+        chip.addEventListener('focus', preview);
+        chip.addEventListener('pointerleave', restore);
+        chip.addEventListener('blur', restore);
+    });
+}
+
+function focusSave(i) {
+    if (savesFocus === i) return;
+    savesFocus = i;
+    document.querySelectorAll('#save-list .slot-card').forEach((c, n) => c.classList.toggle('selected', n === i));
+    renderShowcase();
+}
 
 function focusFirst(name) {
     const el = $(name);
@@ -254,9 +321,11 @@ function showComplete(r) {
     const extra = r.lastOfChapter && d ? stat('Mortes no capítulo', d.chapterDeaths[r.chapter - 1]) : '';
     $('complete-stats').innerHTML = stat('Tempo', fmt(r.time) + (r.record ? ' <em>recorde!</em>' : ''))
         + stat('Morangos', `${r.berries}/${r.totalBerries}`) + stat('Mortes', r.deaths) + extra;
-    $('complete-unlocks').innerHTML = r.newAbilities.length
-        ? `<small>Habilidades desbloqueadas</small><div>${r.newAbilities.map(a => `<span class="unlock-chip cat-${a.category}">${icon(a.icon)} ${a.name}</span>`).join('')}</div>` : '';
-    $('complete-unlocks').classList.toggle('hidden', !r.newAbilities.length);
+    const unlocks = [];
+    if (r.newAbilities.length) unlocks.push(`<small>Habilidades desbloqueadas</small><div>${r.newAbilities.map(a => `<span class="unlock-chip cat-${a.category}">${icon(a.icon)} ${a.name}</span>`).join('')}</div>`);
+    if (r.skin) unlocks.push(`<small>Skin desbloqueada · capítulo sem mortes</small><div><span class="unlock-chip skin-unlock"><i class="skin-swatch" style="${swatch(r.skin)}"></i> ${r.skin.name}</span></div>`);
+    $('complete-unlocks').innerHTML = unlocks.join('');
+    $('complete-unlocks').classList.toggle('hidden', !unlocks.length);
     $('btn-next').textContent = r.lastOfChapter ? 'Próximo capítulo' : 'Próxima fase';
     $('btn-next').classList.toggle('hidden', r.last);
     currentLevel = r.index;
@@ -287,6 +356,7 @@ function playScene(id, done, replay = false) {
     document.body.classList.remove('slowmo');
     document.body.classList.add('cinematic');
     $('cinema').classList.remove('hidden');
+    cinema.skin = Save.data ? Save.data.skins.equipped : 'original';
     cinema.play(id);
 }
 
@@ -366,6 +436,7 @@ function start(index, resume = null) {
     d.chapter = chapterOfLevel(index);
     if (!resume && d.checkpoint && d.checkpoint.level === index) d.checkpoint = null;
     Save.save();
+    Save.startChapterRun(index, resume);
     game.load(index, resume);
     if (d.loadout.length === LOADOUT_SIZE) game.unlock('first_loadout');
     Sfx.setTheme(LEVELS[index].chapter, MUSIC_WIND[LEVELS[index].chapter]);
@@ -423,7 +494,19 @@ function renderSaves() {
     $('saves-title').textContent = saveScreenMode === 'newgame' ? 'Escolha um slot para a nova campanha' : 'Escolha sua campanha';
     const list = $('save-list');
     list.innerHTML = '';
-    for (let i = 0; i < 3; i++) list.appendChild(slotCard(i));
+    if (!Save.slot(savesFocus)) {
+        const first = [0, 1, 2].find(i => Save.slot(i));
+        savesFocus = Save.active >= 0 && Save.slot(Save.active) ? Save.active : first ?? 0;
+    }
+    for (let i = 0; i < 3; i++) {
+        const card = slotCard(i);
+        card.classList.toggle('selected', i === savesFocus);
+        card.addEventListener('pointerenter', () => focusSave(i));
+        card.addEventListener('focusin', () => focusSave(i));
+        card.addEventListener('click', () => focusSave(i));
+        list.appendChild(card);
+    }
+    renderShowcase();
 }
 
 function renderBindings() {
@@ -615,7 +698,16 @@ const actions = {
         saveScreenMode = 'continue';
         enterHub();
     },
-    ...hub.actions
+    ...hub.actions,
+    'equip-skin'(btn) {
+        const skin = skinById(btn.dataset.arg);
+        if (!Save.slot(savesFocus)) return;
+        if (!Save.slot(savesFocus).skins.unlocked.includes(skin.id)) {
+            toast('lock', `${skin.name} está bloqueada`, `Conclua o Capítulo ${skin.chapter} inteiro sem morrer.`);
+            return;
+        }
+        if (Save.equipSkin(savesFocus, skin.id)) renderShowcase();
+    }
 };
 
 document.addEventListener('click', e => {
@@ -794,6 +886,7 @@ function loop(now) {
     if (state === 'hub') {
         if (currentScreen === 'hub' && hub.hero) hub.hero.update(dt);
     } else if (state !== 'cinema') {
+        if (currentScreen === 'saves' && heroInstance) heroInstance.update(dt);
         view.render();
     }
     requestAnimationFrame(loop);

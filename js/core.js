@@ -1,5 +1,6 @@
 import { ABILITIES, LOADOUT_SIZE, abilityById, meetsReq } from './abilities.js';
 import { TOTAL_RECORDS, recordsFound, sanitizeStory } from './story.js';
+import { DEFAULT_SKIN, SKINS, skinById, skinForChapter } from './skins.js';
 
 const PAD_MAP = [
     [0, 'PadJump'], [1, 'PadDash'], [2, 'PadDash'], [3, 'PadSkill3'], [4, 'PadSkill1'], [5, 'PadSkill2'],
@@ -194,8 +195,22 @@ export function sanitizeSave(raw) {
         abilityUses: num(raw.abilityUses)
     };
     sanitizeAbilities(data, raw);
+    data.skins = sanitizeSkins(raw.skins, data);
     data.story = sanitizeStory(raw.story, data, version);
     return data;
+}
+
+function sanitizeSkins(raw, d) {
+    const s = obj(raw);
+    const owned = new Set([DEFAULT_SKIN]);
+    (Array.isArray(s.unlocked) ? s.unlocked : []).forEach(id => { if (skinById(id)) owned.add(id); });
+    SKINS.forEach(k => {
+        if (k.chapter && d.completedChapters.includes(k.chapter) && d.chapterDeaths[k.chapter - 1] === 0) owned.add(k.id);
+    });
+    const unlocked = SKINS.filter(k => owned.has(k.id)).map(k => k.id);
+    const r = s.run;
+    const run = r && [1, 2, 3].includes(r.chapter) && Number.isInteger(r.next) ? { chapter: r.chapter, next: r.next, clean: r.clean === true } : null;
+    return { unlocked, equipped: unlocked.includes(s.equipped) ? s.equipped : DEFAULT_SKIN, run };
 }
 
 function readSlot(key) {
@@ -304,6 +319,43 @@ export const Save = {
     },
     reset() {
         if (this.active >= 0) this.deleteSlot(this.active);
+    },
+    startChapterRun(index, resume) {
+        const d = this.data;
+        if (!d) return;
+        const run = d.skins.run;
+        if (!resume && CHAPTER_STARTS.includes(index)) d.skins.run = { chapter: chapterOfLevel(index), next: index, clean: true };
+        else if (run && run.next !== index) d.skins.run = null;
+        this.save();
+    },
+    chapterDeath(chapter) {
+        const run = this.data && this.data.skins.run;
+        if (run && run.chapter === chapter) run.clean = false;
+    },
+    finishRunLevel(index, lastOfChapter) {
+        const d = this.data;
+        if (!d) return null;
+        const run = d.skins.run;
+        if (!run || run.next !== index) {
+            d.skins.run = null;
+            return null;
+        }
+        if (!lastOfChapter) {
+            run.next = index + 1;
+            return null;
+        }
+        d.skins.run = null;
+        const skin = run.clean ? skinForChapter(run.chapter) : null;
+        if (!skin || d.skins.unlocked.includes(skin.id)) return null;
+        d.skins.unlocked.push(skin.id);
+        return skin;
+    },
+    equipSkin(slot, id) {
+        const d = this.slots[slot];
+        if (!d || !d.skins.unlocked.includes(id)) return false;
+        d.skins.equipped = id;
+        this.write(slot);
+        return true;
     },
     hasSkill(id) {
         const d = this.data;

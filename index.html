@@ -11,6 +11,7 @@
 <canvas id="c"></canvas>
 <div id="vignette"></div>
 <div id="screen-flash"></div>
+<div id="death-veil"></div>
 <div id="letterbox"><i></i><i></i></div>
 
 <div id="hud" class="hidden">
@@ -63,7 +64,14 @@
 
 <div id="saves" class="screen hidden">
     <h2 id="saves-title">Saves</h2>
-    <div id="save-list"></div>
+    <div class="saves-body">
+        <div id="save-list"></div>
+        <aside class="showcase" aria-label="Protagonista e skins">
+            <div id="showcase-stage" class="showcase-stage"><span class="showcase-hint">Arraste para girar</span></div>
+            <div class="showcase-info"><small id="showcase-slot"></small><h3 id="showcase-name"></h3><p id="showcase-note"></p></div>
+            <div id="showcase-skins" class="skin-grid"></div>
+        </aside>
+    </div>
     <button class="btn" data-act="back">Voltar</button>
 </div>
 

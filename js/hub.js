@@ -339,7 +339,11 @@ export function createHub(ctx) {
         const canvas = $('hero');
         slot.appendChild(canvas);
         canvas.classList.toggle('hidden', !ui.hero);
-        if (ui.hero) ui.hero.setChapter(levelFacts(continueLevel(Save.data)).chapter);
+        if (ui.hero) {
+            ui.hero.setChapter(levelFacts(continueLevel(Save.data)).chapter);
+            ui.hero.setSkin(Save.data.skins.equipped);
+            ui.hero.frame(false);
+        }
     }
 
     function renderPanel(animate = true) {

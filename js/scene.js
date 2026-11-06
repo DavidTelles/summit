@@ -79,6 +79,7 @@ export class View {
         this.setupPost();
         this.setupSlashes();
         this.flashEl = document.getElementById('screen-flash');
+        this.veilEl = document.getElementById('death-veil');
         this.resize();
         addEventListener('resize', () => this.resize());
     }
@@ -345,6 +346,10 @@ export class View {
         this.flashEl.classList.remove('on');
         void this.flashEl.offsetWidth;
         this.flashEl.classList.add('on');
+    }
+
+    deathVeil(on) {
+        if (this.veilEl) this.veilEl.classList.toggle('on', on);
     }
 
     spawnPop() {

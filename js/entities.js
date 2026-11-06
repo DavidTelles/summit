@@ -1,5 +1,7 @@
 import * as THREE from '../lib/three.module.js';
 import { INK, LAYER, basic, canvasTexture, clipTo, glowSprite, hatch, mixHex, pivot, radial, rawCanvas, rgba, shape, sprite, stroke, vGrad } from './ink.js';
+import { applySkin, disposeBoykisser, makeBoykisser, poseJoint } from './boykisser.js';
+import { DEATH_TIME, PLAYER_HP } from './config.js';
 
 const PALETTES = {
     1: { stone: '#7b7f86', dark: '#2d3038', deep: '#191b22', moss: '#5f8054', glow: '#7fe3ff', metal: '#8d8878', accent: '#d9c9a0' },
@@ -83,317 +85,367 @@ export function makeAbilityMarker(color) {
     }, { ppu: 80, additive: true, own: true, color, layer: LAYER.fx });
 }
 
-const P = { dark: '#191a23', cloth: '#2a2b38', cloth2: '#3a3c4d', skin: '#d8b49c', glove: '#14141c', boot: '#1a1a23', strap: '#4a382e', rim: '#747790' };
 const K_LAYER = LAYER.player;
-const kpart = (key, w, h, draw, ax, ay, order) => sprite(`kael.${key}`, w, h, draw, { ax, ay, layer: K_LAYER + order });
+const YAW = Math.PI * 0.36;
+const SPIN_SPEED = 26;
+const DASH_DRAINED = new THREE.Color(0x7b8fb3);
+const DASH_FULL = new THREE.Color(0xffffff);
+const GROUNDED = new Set(['idle', 'walk', 'run', 'land']);
+const WOUND_POSES = new Set(['idle', 'walk', 'run', 'land']);
+const footPos = new THREE.Vector3();
 
-function drawThigh(front) {
-    return ctx => {
-        const fill = front ? P.cloth2 : P.dark;
-        shape(ctx, [[-0.08, 0.03], [0.08, 0.03], [0.07, -0.1], [0.055, -0.21], [-0.05, -0.21], [-0.075, -0.1]], fill);
-        if (front) stroke(ctx, [[0.05, -0.02], [0.04, -0.16]], 0.012, P.rim);
-    };
-}
-function drawShin(front) {
-    return ctx => {
-        shape(ctx, [[-0.055, 0.02], [0.055, 0.02], [0.06, -0.13], [0.06, -0.17], [0.15, -0.2], [0.16, -0.24, 1], [-0.07, -0.24, 1], [-0.06, -0.12]], front ? P.boot : '#0d0d13');
-        stroke(ctx, [[-0.045, -0.07], [0.055, -0.08]], 0.018, P.strap);
-        if (front) stroke(ctx, [[0.045, 0], [0.05, -0.12]], 0.01, P.rim);
-    };
-}
-function drawUpperArm(front) {
-    return ctx => {
-        shape(ctx, [[-0.055, 0.04], [0.055, 0.04], [0.05, -0.1], [0.04, -0.17], [-0.04, -0.17], [-0.05, -0.1]], front ? P.cloth2 : P.dark);
-    };
-}
-function drawForeArm(front) {
-    return ctx => {
-        shape(ctx, [[-0.04, 0.02], [0.04, 0.02], [0.05, -0.1], [0.075, -0.15], [0.065, -0.23], [-0.02, -0.25], [-0.065, -0.2], [-0.05, -0.11]], P.glove);
-        stroke(ctx, [[-0.05, -0.08], [0.05, -0.08]], 0.016, front ? '#393b49' : '#22232c');
-    };
-}
-function drawTorso(ctx) {
-    const pts = [[-0.14, 0.34], [0.12, 0.34], [0.15, 0.1], [0.12, -0.04], [-0.13, -0.04], [-0.17, 0.12]];
-    shape(ctx, pts, P.cloth);
-    clipTo(ctx, pts, () => {
-        ctx.fillStyle = vGrad(ctx, 0.34, -0.04, 'rgba(70,72,90,0.35)', 'rgba(0,0,0,0.35)');
-        ctx.fillRect(-0.3, -0.1, 0.6, 0.5);
-        hatch(ctx, -0.14, -0.02, 0, 0.26, 9, 'rgba(0,0,0,0.45)', 0.01, 5);
-    });
-    stroke(ctx, [[-0.13, 0.03], [0.13, 0.02]], 0.03, P.strap);
-    ctx.fillStyle = '#9a7a52';
-    ctx.fillRect(0.02, -0.002, 0.05, 0.045);
-    stroke(ctx, [[-0.1, 0.3], [0.1, 0.05]], 0.02, P.strap);
-}
-function drawHood(ctx) {
-    const pts = [[-0.3, 0.02], [-0.3, 0.22], [-0.17, 0.38], [0.04, 0.42], [0.22, 0.32], [0.3, 0.12], [0.28, -0.08], [0.18, -0.24], [-0.05, -0.28], [-0.24, -0.2]];
-    shape(ctx, pts, P.dark, 0.032);
-    clipTo(ctx, pts, () => {
-        ctx.fillStyle = vGrad(ctx, 0.42, -0.28, 'rgba(92,94,116,0.5)', 'rgba(0,0,0,0.2)');
-        ctx.fillRect(-0.4, -0.3, 0.8, 0.8);
-        stroke(ctx, [[-0.28, 0.05], [-0.1, 0.26], [0.08, 0.36]], 0.012, 'rgba(0,0,0,0.6)');
-    });
-    stroke(ctx, [[-0.26, 0.26], [-0.08, 0.39], [0.1, 0.4]], 0.014, P.rim);
-}
-function drawFace(ctx) {
-    const face = [[-0.02, 0.2], [0.19, 0.2], [0.27, 0.08], [0.27, -0.1], [0.05, -0.12], [-0.04, 0.02]];
-    shape(ctx, face, P.skin, 0.022);
-    clipTo(ctx, face, () => {
-        ctx.fillStyle = 'rgba(60,30,40,0.35)';
-        ctx.fillRect(-0.1, 0.1, 0.5, 0.12);
-    });
-    const mask = [[-0.1, -0.03, 1], [0.1, -0.01], [0.29, 0.015], [0.3, -0.1], [0.22, -0.22], [0.02, -0.26], [-0.15, -0.18]];
-    shape(ctx, mask, '#0c0c12', 0.028);
-    stroke(ctx, [[0.05, -0.03], [0.14, -0.15], [0.25, -0.17]], 0.011, '#34353f');
-    stroke(ctx, [[-0.06, 0.0], [0.16, 0.012], [0.28, 0.008]], 0.012, '#3f404c');
-}
-function drawEyes(ctx) {
-    shape(ctx, [[0.05, 0.075], [0.12, 0.11], [0.15, 0.07], [0.1, 0.045]], '#f6f1e6', 0.012);
-    shape(ctx, [[0.19, 0.075], [0.24, 0.105], [0.26, 0.07], [0.22, 0.045]], '#f6f1e6', 0.012);
-    ctx.fillStyle = INK;
+const POSES = {
+    idle: { lean: 0.03, hip: 0.4, tF: 0.1, sF: -0.16, tB: -0.12, sB: -0.16, uF: -0.12, lF: 0.28, uB: 0.14, lB: 0.3, head: -0.03 },
+    walk: { lean: 0.09, hip: 0.4, tF: 0, sF: 0, tB: 0, sB: 0, uF: 0, lF: 0.3, uB: 0, lB: 0.3, head: -0.05 },
+    run: { lean: 0.3, hip: 0.4, tF: 0, sF: 0, tB: 0, sB: 0, uF: 0, lF: 0.9, uB: 0, lB: 0.9, head: -0.2 },
+    jump: { lean: 0.1, hip: 0.4, tF: 1, sF: -1.3, tB: -0.25, sB: -0.5, uF: 1.1, lF: 0.6, uB: -0.75, lB: 0.3, head: 0.05 },
+    spin: { lean: 0, hip: 0.4, tF: 2.3, sF: -2.5, tB: 2.1, sB: -2.5, uF: 1.3, lF: 1.9, uB: 1.1, lB: 1.9, head: 0.75 },
+    fall: { lean: -0.05, hip: 0.4, tF: 0.45, sF: -0.85, tB: -0.2, sB: -0.75, uF: 2.1, lF: 0.3, uB: -1.9, lB: 0.3, head: 0.12 },
+    land: { lean: 0.35, hip: 0.4, tF: 1.1, sF: -1.7, tB: 0.7, sB: -1.6, uF: -0.5, lF: 0.4, uB: 0.45, lB: 0.5, head: -0.3 },
+    dash: { lean: 1.1, hip: 0.4, tF: 0.45, sF: -1.1, tB: -1.05, sB: -0.5, uF: 1.45, lF: 0.05, uB: -1.35, lB: 0.2, head: -0.85 },
+    grab: { lean: -0.04, hip: 0.4, tF: 1.05, sF: -1.1, tB: 0.7, sB: -1.3, uF: 2.2, lF: -0.5, uB: 1.9, lB: -0.5, head: 0 },
+    climb: { lean: -0.04, hip: 0.4, tF: 0.9, sF: -1.1, tB: 0.6, sB: -1.2, uF: 2.2, lF: -0.5, uB: 2, lB: -0.5, head: 0.08 },
+    slide: { lean: -0.12, hip: 0.4, tF: 1, sF: -0.9, tB: 0.5, sB: -1, uF: 2.5, lF: -0.3, uB: -0.3, lB: 0.5, head: 0.1 },
+    pound: { lean: 0.2, hip: 0.4, tF: 1.7, sF: -2.1, tB: 1.45, sB: -2.1, uF: 2.8, lF: 0.1, uB: 2.8, lB: 0.1, head: -0.4 },
+    hurt: { lean: -0.5, hip: 0.4, tF: 0.5, sF: -0.4, tB: -0.5, sB: -0.5, uF: 2, lF: 0.3, uB: -2, lB: 0.3, head: -0.45 },
+    glide: { lean: 0.14, hip: 0.4, tF: 0.3, sF: -0.5, tB: -0.25, sB: -0.5, uF: 1.75, lF: 0.15, uB: -1.75, lB: -0.15, head: -0.1 },
+    cast: { lean: 0.1, hip: 0.4, tF: 0.4, sF: -0.5, tB: -0.3, sB: -0.3, uF: 1.55, lF: 0.05, uB: -0.5, lB: 0.4, head: -0.1 },
+    fallen: { lean: 0.55, hip: 0.4, tF: 1.65, sF: -2.4, tB: 1.45, sB: -2.4, uF: -0.15, lF: 0.25, uB: 0.1, lB: 0.2, head: 0.95 }
+};
+const POSE_KEYS = Object.keys(POSES.idle);
+
+const ghostDraw = ctx => {
+    ctx.fillStyle = '#ffffff';
     ctx.beginPath();
-    ctx.arc(0.115, 0.075, 0.021, 0, 7);
-    ctx.arc(0.23, 0.075, 0.018, 0, 7);
+    ctx.ellipse(0, 0.25, 0.22, 0.3, 0, 0, Math.PI * 2);
+    ctx.ellipse(0.04, 0.72, 0.3, 0.27, 0, 0, Math.PI * 2);
     ctx.fill();
-    stroke(ctx, [[0.03, 0.125], [0.13, 0.135]], 0.014, '#2a0f10');
-    stroke(ctx, [[0.19, 0.13], [0.265, 0.115]], 0.013, '#2a0f10');
-}
-function drawHairTop(ctx) {
-    const h = [[-0.17, 0.28, 1], [-0.27, 0.4, 1], [-0.11, 0.37, 1], [-0.13, 0.53, 1], [0.0, 0.42, 1], [0.05, 0.57, 1], [0.13, 0.42, 1], [0.27, 0.48, 1], [0.24, 0.32, 1], [0.37, 0.26, 1], [0.27, 0.18, 1], [0.33, 0.04, 1], [0.21, 0.11, 1], [0.15, 0.0, 1], [0.1, 0.13, 1], [0.02, 0.05, 1], [-0.02, 0.17, 1], [-0.14, 0.13, 1]];
-    shape(ctx, h, '#f1f1f1', 0.026);
-    clipTo(ctx, h, () => {
-        ctx.fillStyle = vGrad(ctx, 0.55, 0.05, 'rgba(255,255,255,0.0)', 'rgba(70,70,70,0.75)');
-        ctx.fillRect(-0.4, 0, 0.9, 0.6);
-    });
-    for (const line of [[[-0.05, 0.42], [0, 0.26], [0.02, 0.14]], [[0.11, 0.38], [0.12, 0.25], [0.15, 0.11]], [[0.23, 0.36], [0.22, 0.24], [0.27, 0.14]]]) stroke(ctx, line, 0.012, 'rgba(60,60,60,0.8)');
-    stroke(ctx, [[-0.08, 0.44], [-0.02, 0.33]], 0.012, 'rgba(255,255,255,0.9)');
-    stroke(ctx, [[0.05, 0.5], [0.07, 0.38]], 0.012, 'rgba(255,255,255,0.9)');
-}
-function drawLock(i) {
-    return ctx => {
-        shape(ctx, i === 0
-            ? [[0.03, 0.05], [-0.03, 0.06], [-0.13, -0.1], [-0.13, -0.26, 1], [-0.04, -0.14], [0.04, -0.21, 1], [0.05, -0.04]]
-            : [[0.03, 0.03], [-0.03, 0.03], [-0.08, -0.1], [-0.05, -0.23, 1], [0.03, -0.1]], '#e7e7e7', 0.022);
-        stroke(ctx, [[0, 0.02], [-0.04, -0.12]], 0.01, 'rgba(50,50,50,0.8)');
-    };
-}
-function drawCloak(i) {
-    return ctx => {
-        const w = 0.2 - i * 0.03;
-        const h = 0.3 - i * 0.03;
-        const pts = i === 2
-            ? [[-w, 0.03], [w, 0.03], [w * 0.9, -h * 0.5], [w * 0.75, -h, 1], [w * 0.2, -h * 0.65], [-w * 0.1, -h * 1.1, 1], [-w * 0.55, -h * 0.6], [-w, -h * 0.95, 1]]
-            : [[-w, 0.04], [w, 0.04], [w * 1.05, -h], [-w * 1.1, -h]];
-        shape(ctx, pts, i === 0 ? '#191a23' : i === 1 ? '#15161e' : '#111118', 0.024);
-        stroke(ctx, [[-w * 0.3, 0], [-w * 0.4, -h * 0.8]], 0.012, '#30313d');
-        stroke(ctx, [[w * 0.45, 0], [w * 0.55, -h * 0.7]], 0.012, '#07070c');
-    };
-}
+    ctx.beginPath();
+    ctx.moveTo(-0.22, 0.82); ctx.lineTo(-0.14, 1.18); ctx.lineTo(0.02, 0.93);
+    ctx.moveTo(0.08, 0.95); ctx.lineTo(0.24, 1.2); ctx.lineTo(0.31, 0.84);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.ellipse(-0.36, 0.24, 0.22, 0.11, -0.5, 0, Math.PI * 2);
+    ctx.fill();
+};
 
-export function makePlayer() {
+const ringDraw = ctx => {
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineCap = 'round';
+    for (let i = 0; i < 3; i++) {
+        ctx.lineWidth = 0.05 - i * 0.012;
+        ctx.beginPath();
+        ctx.arc(0, 0, 0.56 - i * 0.05, (i * Math.PI * 2) / 3, (i * Math.PI * 2) / 3 + 1.5);
+        ctx.stroke();
+    }
+};
+
+const threadDraw = ctx => {
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 0.022;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(-0.26, -0.02);
+    ctx.bezierCurveTo(-0.1, 0.07, 0.04, -0.07, 0.26, 0.03);
+    ctx.stroke();
+};
+
+export function makePlayer(skin) {
     const group = new THREE.Group();
-    const flip = new THREE.Group();
     const body = new THREE.Group();
+    const spin = new THREE.Group();
+    const inner = new THREE.Group();
+    const hip = new THREE.Group();
+    const yaw = new THREE.Group();
     const halo = glowSprite(0xe8dcc0, 1.9, { opacity: 0.2, layer: K_LAYER - 3, x: 0, y: 0.72 });
-    const fallen = sprite('kael.fallen', 1.4, 1, ctx => {
-        shape(ctx, [[-0.6, 0.02, 1], [-0.34, 0.26], [0.1, 0.32], [0.42, 0.18], [0.56, 0.02, 1]], '#191a23', 0.03);
-        stroke(ctx, [[-0.4, 0.05], [-0.1, 0.2], [0.3, 0.05]], 0.015, '#3a3c4d');
-        shape(ctx, [[-0.08, 0.3, 1], [-0.2, 0.46, 1], [0, 0.4, 1], [0.08, 0.56, 1], [0.16, 0.38, 1], [0.34, 0.43, 1], [0.26, 0.24, 1]], '#d8342a', 0.024);
-    }, { ay: 0, layer: K_LAYER + 1, own: true });
-    fallen.visible = false;
-    const shadow = sprite('kael.shadow', 1.2, 0.3, ctx => {
+    const shadow = sprite('player.shadow', 1.2, 0.3, ctx => {
         ctx.save();
         ctx.scale(1, 0.25);
         radial(ctx, 0, 0, 0.6, '#000000', 0.7);
         ctx.restore();
     }, { ppu: 60, layer: LAYER.shadow, y: -0.02 });
-
-    const cloak = [0, 1, 2].map(i => pivot(0, 0, kpart(`cloak${i}`, 0.6, 0.5, drawCloak(i), 0.5, 0.86, 2 - i)));
-    const c0 = pivot(-0.06, 0.32, cloak[0]);
-    cloak[1].position.y = -0.26;
-    cloak[2].position.y = -0.24;
-    cloak[0].add(cloak[1]);
-    cloak[1].add(cloak[2]);
-
-    const limb = (upperKey, lowerKey, upper, lower, order, upperLen) => {
-        const a = pivot(0, 0, kpart(upperKey, 0.3, 0.32, upper, 0.5, 0.75, order));
-        const b = pivot(0, -upperLen, kpart(lowerKey, 0.42, 0.36, lower, 0.42, 0.8, order + 1));
-        a.add(b);
-        return { a, b };
-    };
-    const legB = limb('thighB', 'shinB', drawThigh(false), drawShin(false), 3, 0.19);
-    const legF = limb('thighF', 'shinF', drawThigh(true), drawShin(true), 7, 0.19);
-    const armB = limb('uarmB', 'farmB', drawUpperArm(false), drawForeArm(false), 5, 0.14);
-    const armF = limb('uarmF', 'farmF', drawUpperArm(true), drawForeArm(true), 18, 0.14);
-    legB.a.position.set(-0.03, 0.02, 0);
-    legF.a.position.set(0.04, 0.02, 0);
-    armB.a.position.set(-0.05, 0.28, 0);
-    armF.a.position.set(0.01, 0.28, 0);
-
-    const torso = kpart('torso', 0.46, 0.52, drawTorso, 0.5, 0.2, 9);
-    const hood = kpart('hood', 0.72, 0.8, drawHood, 0.48, 0.42, 11);
-    const face = kpart('face', 0.72, 0.56, drawFace, 0.4, 0.55, 12);
-    const eyes = kpart('eyes', 0.6, 0.3, drawEyes, 0.3, 0.3, 13);
-    const hairTop = sprite('kael.hairTop', 0.84, 0.72, drawHairTop, { ax: 0.45, ay: 0.02, layer: K_LAYER + 15, own: true });
-    const lock0 = sprite('kael.lock0', 0.36, 0.42, drawLock(0), { ax: 0.5, ay: 0.82, layer: K_LAYER + 10, own: true });
-    const lock1 = sprite('kael.lock1', 0.26, 0.32, drawLock(1), { ax: 0.5, ay: 0.86, layer: K_LAYER + 10, own: true });
-    const lockA = pivot(-0.24, 0.12, lock0);
-    const lockB = pivot(-0.05, -0.2, lock1);
-    lockA.add(lockB);
-    const head = pivot(0.0, 0.42, hood, face, eyes, lockA, hairTop);
-    const upper = pivot(0, 0.03, torso, armB.a, armF.a, head);
-    const hip = pivot(0, 0.4, c0, legB.a, legF.a, upper);
-    body.add(hip);
-    flip.add(body);
-    group.add(shadow, halo, fallen, flip);
+    const model = makeBoykisser(K_LAYER + 5, skin);
+    const hipY = model ? model.hipY : 0.4;
+    const center = hipY + 0.12;
+    const ring = sprite('player.spinRing', 1.3, 1.3, ringDraw, { ppu: 80, additive: true, own: true, color: 0xdff6ff, layer: K_LAYER + 9, opacity: 0, y: center });
+    ring.visible = false;
+    spin.position.y = center;
+    inner.position.y = -center;
+    hip.position.y = hipY;
+    yaw.position.y = -hipY;
+    if (model) {
+        yaw.add(model.root);
+        group.add(model.lights);
+    }
+    hip.add(yaw);
+    inner.add(hip);
+    spin.add(inner);
+    body.add(spin, ring);
+    group.add(shadow, halo, body);
     group.userData = {
-        halo, fallen, flip, body, hip, upper, head, eyes, cloak, lockA, lockB, legB, legF, armB, armF, shadow, hairMats: [hairTop.material, lock0.material, lock1.material],
-        spinAngle: 0, turn: 1, phase: 0, cur: { ...POSES.idle }, cloakA: [0, 0, 0], cloakV: [0, 0, 0], lockV: 0, lockAngle: 0, blink: 2, ghosts: [], ghostT: 0, ghostI: 0, land: 0, wasAir: false
+        halo, shadow, body, spin, ring, hip, yaw, model, hipY,
+        turn: 1, phase: 0, cur: { ...POSES.idle }, tailA: 0, tailV: 0,
+        ball: 0, spinAngle: 0, footFix: 0, wound: 0, flash: 0, lastHp: null, appear: 0, wasDead: false,
+        ghosts: [], ghostT: 0, ghostI: 0, threads: [], threadT: 0
     };
     return group;
 }
 
-const POSES = {
-    idle: { lean: 0.03, hip: 0.4, tF: 0.1, sF: -0.16, tB: -0.12, sB: -0.16, uF: -0.12, lF: 0.28, uB: 0.14, lB: 0.3, head: -0.03 },
-    walk: { lean: 0.09, hip: 0.4, tF: 0, sF: 0, tB: 0, sB: 0, uF: 0, lF: 0.3, uB: 0, lB: 0.3, head: -0.05 },
-    run: { lean: 0.3, hip: 0.385, tF: 0, sF: 0, tB: 0, sB: 0, uF: 0, lF: 0.9, uB: 0, lB: 0.9, head: -0.2 },
-    jump: { lean: 0.1, hip: 0.42, tF: 1, sF: -1.3, tB: -0.25, sB: -0.5, uF: 1.1, lF: 0.6, uB: -0.75, lB: 0.3, head: 0.05 },
-    spin: { lean: 0.1, hip: 0.4, tF: 1.5, sF: -2, tB: 1.3, sB: -2, uF: 0.9, lF: 1.4, uB: 0.9, lB: 1.4, head: 0.1 },
-    fall: { lean: -0.05, hip: 0.42, tF: 0.45, sF: -0.85, tB: -0.2, sB: -0.75, uF: 2.1, lF: 0.3, uB: -1.9, lB: 0.3, head: 0.12 },
-    land: { lean: 0.45, hip: 0.25, tF: 1.3, sF: -1.9, tB: 0.75, sB: -1.75, uF: -0.5, lF: 0.4, uB: 0.45, lB: 0.5, head: -0.35 },
-    dash: { lean: 1.2, hip: 0.4, tF: 0.45, sF: -1.1, tB: -1.05, sB: -0.5, uF: 1.45, lF: 0.05, uB: -1.35, lB: 0.2, head: -0.95 },
-    grab: { lean: -0.04, hip: 0.4, tF: 1.05, sF: -1.1, tB: 0.7, sB: -1.3, uF: 2.2, lF: -0.5, uB: 1.9, lB: -0.5, head: 0 },
-    climb: { lean: -0.04, hip: 0.4, tF: 0.9, sF: -1.1, tB: 0.6, sB: -1.2, uF: 2.2, lF: -0.5, uB: 2, lB: -0.5, head: 0.08 },
-    slide: { lean: -0.12, hip: 0.38, tF: 1, sF: -0.9, tB: 0.5, sB: -1, uF: 2.5, lF: -0.3, uB: -0.3, lB: 0.5, head: 0.1 },
-    pound: { lean: 0.2, hip: 0.4, tF: 1.7, sF: -2.1, tB: 1.45, sB: -2.1, uF: 2.8, lF: 0.1, uB: 2.8, lB: 0.1, head: -0.4 },
-    hurt: { lean: -0.55, hip: 0.4, tF: 0.5, sF: -0.4, tB: -0.5, sB: -0.5, uF: 2, lF: 0.3, uB: -2, lB: 0.3, head: -0.5 },
-    glide: { lean: 0.14, hip: 0.42, tF: 0.3, sF: -0.5, tB: -0.25, sB: -0.5, uF: 1.75, lF: 0.15, uB: -1.75, lB: -0.15, head: -0.1 },
-    cast: { lean: 0.1, hip: 0.38, tF: 0.4, sF: -0.5, tB: -0.3, sB: -0.3, uF: 1.55, lF: 0.05, uB: -0.5, lB: 0.4, head: -0.1 },
-    dead: { lean: 0, hip: 0.4, tF: 0, sF: 0, tB: 0, sB: 0, uF: 0, lF: 0, uB: 0, lB: 0, head: 0 }
-};
-const HAIR_COLORS = [0x7b8fb3, 0xd8342a, 0xff5142];
+export function setPlayerSkin(group, skin) {
+    const m = group.userData.model;
+    if (m) applySkin(m, skin);
+}
+
+export function disposePlayer(group) {
+    const u = group.userData;
+    disposeBoykisser(u.model);
+    u.ring.material.dispose();
+    [...u.ghosts, ...u.threads.map(t => t.mesh)].forEach(g => {
+        if (g.parent) g.parent.remove(g);
+        g.material.dispose();
+    });
+}
 
 function spawnGhosts(group, u) {
     if (u.ghosts.length || !group.parent) return;
     for (let i = 0; i < 6; i++) {
-        const g = sprite('kael.ghost', 1.3, 1.5, ctx => {
-            shape(ctx, [[-0.3, 0.55], [-0.1, 0.72], [0.15, 0.72], [0.3, 0.45], [0.25, 0.2], [0.42, -0.1], [0.3, -0.2], [-0.05, -0.05], [-0.48, -0.25], [-0.55, -0.1], [-0.2, 0.2]], '#ffffff', 0);
-        }, { ppu: 48, additive: true, own: true, color: 0xe8423a, layer: K_LAYER - 2, opacity: 0, ay: 0.2 });
+        const g = sprite('player.ghost', 1.3, 1.5, ghostDraw, { ppu: 48, additive: true, own: true, color: 0xff6fae, layer: K_LAYER - 2, opacity: 0, ay: 0.2 });
         g.visible = false;
         group.parent.add(g);
         u.ghosts.push(g);
     }
 }
 
+function spawnThread(group, u) {
+    if (!group.parent) return;
+    let t = u.threads.find(o => o.life <= 0);
+    if (!t) {
+        if (u.threads.length >= 18) return;
+        const mesh = sprite('player.thread', 0.6, 0.2, threadDraw, { ppu: 90, additive: true, own: true, color: 0xbfefff, layer: K_LAYER + 9, opacity: 0 });
+        group.parent.add(mesh);
+        t = { mesh, life: 0 };
+        u.threads.push(t);
+    }
+    t.mesh.visible = true;
+    t.mesh.position.set(group.position.x + (Math.random() - 0.5) * 0.6, group.position.y + 0.15 + Math.random() * 0.9, 0.2);
+    t.vx = (Math.random() - 0.5) * 1.6;
+    t.vy = 1.4 + Math.random() * 1.8;
+    t.spin = (Math.random() - 0.5) * 9;
+    t.mesh.rotation.z = Math.random() * Math.PI;
+    t.mesh.scale.setScalar(0.45 + Math.random() * 0.5);
+    t.life = t.max = 0.7 + Math.random() * 0.5;
+}
+
+function updateTrails(u, dt, t) {
+    u.ghosts.forEach(g => {
+        if (!g.visible) return;
+        g.material.opacity -= dt * 2.4;
+        if (g.material.opacity <= 0) g.visible = false;
+    });
+    u.threads.forEach(o => {
+        if (o.life <= 0) return;
+        o.life -= dt;
+        o.vy += dt * 0.8;
+        o.mesh.position.x += (o.vx + Math.sin(t * 6 + o.max * 9) * 0.6) * dt;
+        o.mesh.position.y += o.vy * dt;
+        o.mesh.rotation.z += o.spin * dt;
+        const k = Math.max(0, o.life / o.max);
+        o.mesh.material.opacity = Math.min(1, (1 - k) * 6) * k * 0.9;
+        if (o.life <= 0) o.mesh.visible = false;
+    });
+}
+
+function poseModel(u, a, facing, t, dt) {
+    const m = u.model;
+    if (!m) return;
+    const j = m.joints;
+    poseJoint(j.thighF, a.tF);
+    poseJoint(j.shinF, a.sF);
+    poseJoint(j.thighB, a.tB);
+    poseJoint(j.shinB, a.sB);
+    poseJoint(j.armF, a.uF);
+    poseJoint(j.foreF, a.lF);
+    poseJoint(j.armB, a.uB);
+    poseJoint(j.foreB, a.lB);
+    poseJoint(j.neck, a.head * 0.5);
+    poseJoint(j.head, a.head * 0.5);
+    u.tailV += ((a.tail - u.tailA) * 80 - u.tailV * 11) * dt;
+    u.tailA += u.tailV * dt;
+    [j.tail0, j.tail1, j.tail2, j.tail3, j.tail4].forEach(tail => poseJoint(tail, u.tailA * 0.3));
+    m.fx.uHurt.value = u.wound;
+    m.fx.uFlash.value = u.flash;
+}
+
+function groundFeet(group, u, base, squash) {
+    const m = u.model;
+    let lowest = Infinity;
+    for (const foot of m.feet) {
+        foot.getWorldPosition(footPos);
+        lowest = Math.min(lowest, group.worldToLocal(footPos).y);
+    }
+    const error = lowest - m.ankleY * squash;
+    u.footFix = Math.max(-0.6, Math.min(0.25, u.footFix - error * 0.6));
+    u.hip.position.y = base + u.footFix;
+}
+
+function animateDeath(group, p, dt, t, facing) {
+    const u = group.userData;
+    const m = u.model;
+    if (!u.wasDead) {
+        u.wasDead = true;
+        u.flash = 1;
+        u.threadT = 0;
+    }
+    const e = p.deadTimer !== undefined ? DEATH_TIME - p.deadTimer : DEATH_TIME;
+    const target = e < 0.12 ? POSES.hurt : POSES.fallen;
+    const k = Math.min(1, dt * (e < 0.12 ? 30 : 11));
+    for (const key of POSE_KEYS) u.cur[key] = damp(u.cur[key], target[key], k);
+    const a = u.cur;
+    const collapse = Math.min(1, Math.max(0, (e - 0.12) / 0.28));
+    const fade = Math.min(1, Math.max(0, (e - 0.26) / 0.46));
+    u.ball = damp(u.ball, 0, Math.min(1, dt * 14));
+    u.spinAngle = 0;
+    u.spin.rotation.z = 0;
+    u.spin.scale.setScalar(1);
+    u.ring.visible = false;
+    u.body.scale.set(1, 1, 1);
+    u.footFix = damp(u.footFix, 0, Math.min(1, dt * 8));
+    u.hip.position.y = u.hipY * (1 - 0.42 * collapse) + u.footFix;
+    u.hip.position.x = -facing * 0.08 * Math.min(1, e / 0.12) * (1 - collapse * 0.5);
+    u.hip.rotation.z = -a.lean * facing;
+    u.flash = Math.max(u.flash, e < 0.1 ? 1 : 0);
+    poseModel(u, { ...a, uF: a.uF + Math.sin(t * 30) * 0.04 * (1 - collapse), tail: -0.4 - collapse * 0.8 }, facing, t, dt);
+    if (m) m.fx.uDissolve.value = fade * fade * (3 - 2 * fade);
+    if (e > 0.28 && e < 0.74) {
+        u.threadT -= dt;
+        while (u.threadT <= 0) {
+            u.threadT += 0.028;
+            spawnThread(group, u);
+        }
+    }
+    u.halo.visible = false;
+    u.shadow.visible = fade < 0.5 && p.onGround !== false;
+    group.visible = true;
+}
+
 export function animatePlayer(group, p, pose, dt, t) {
     const u = group.userData;
-    const fast = pose === 'dash' || pose === 'land' || pose === 'hurt' || pose === 'pound';
-    const k = Math.min(1, dt * (fast ? 30 : 15));
+    const m = u.model;
     u.turn = damp(u.turn, p.facing, Math.min(1, dt * 26));
     group.position.set(p.x, p.y, 0.1);
-    u.fallen.visible = !!p.dead;
-    u.flip.visible = !p.dead;
+    const facing = u.turn >= 0 ? 1 : -1;
+    u.yaw.rotation.y = u.turn * YAW;
 
-    u.halo.visible = !p.dead;
+    const hp = p.hp ?? PLAYER_HP;
+    if (u.lastHp !== null && hp < u.lastHp && !p.dead) u.flash = 1;
+    u.lastHp = hp;
+    const woundGoal = p.dead ? u.wound : Math.min(1, Math.max(0, (PLAYER_HP - hp) / (PLAYER_HP - 1)));
+    u.wound = damp(u.wound, woundGoal, Math.min(1, dt * (woundGoal > u.wound ? 16 : 1.4)));
+    u.flash = Math.max(0, u.flash - dt * 6);
+    updateTrails(u, dt, t);
+
     if (p.dead) {
-        const k = Math.max(0, (p.deadTimer ?? 0) / 0.8);
-        u.fallen.scale.x = u.turn >= 0 ? 1 : -1;
-        u.fallen.scale.y = 0.5 + k * 0.5;
-        u.fallen.material.opacity = k;
-        group.visible = true;
+        animateDeath(group, p, dt, t, facing);
         return;
     }
-    const flipScale = (u.turn >= 0 ? 1 : -1) * Math.max(0.25, Math.abs(u.turn));
-    u.flip.scale.x = flipScale;
+    if (u.wasDead) {
+        u.wasDead = false;
+        u.appear = 1;
+        u.cur = { ...POSES.idle };
+        u.ball = 0;
+        u.footFix = 0;
+        u.hip.position.x = 0;
+    }
+    u.appear = Math.max(0, u.appear - dt * 3.5);
+    if (m) m.fx.uDissolve.value = u.appear;
+    u.halo.visible = true;
 
+    const fast = pose === 'dash' || pose === 'land' || pose === 'hurt' || pose === 'pound';
+    const k = Math.min(1, dt * (fast ? 30 : 15));
     const target = POSES[p.casting > 0 && pose === 'idle' ? 'cast' : pose] || POSES.idle;
     const cur = u.cur;
-    for (const key of Object.keys(cur)) cur[key] = damp(cur[key], target[key], k);
+    for (const key of POSE_KEYS) cur[key] = damp(cur[key], target[key], k);
 
-    let tF = cur.tF;
-    let sF = cur.sF;
-    let tB = cur.tB;
-    let sB = cur.sB;
-    let uF = cur.uF;
-    let uB = cur.uB;
+    const w = WOUND_POSES.has(pose) ? u.wound : 0;
+    const a = { ...cur, tail: 0 };
     let bob = 0;
     if (pose === 'walk' || pose === 'run') {
         const run = pose === 'run';
         u.phase += dt * Math.abs(p.vx) * (run ? 1.55 : 2.5);
-        const a = u.phase;
+        const ph = u.phase;
         const reach = run ? 1.05 : 0.6;
-        tF = Math.sin(a) * reach + (run ? 0.18 : 0.05);
-        tB = Math.sin(a + Math.PI) * reach + (run ? 0.18 : 0.05);
-        sF = -Math.max(0, Math.cos(a) * (run ? 1.55 : 0.85)) - 0.14;
-        sB = -Math.max(0, Math.cos(a + Math.PI) * (run ? 1.55 : 0.85)) - 0.14;
-        uF = Math.sin(a + Math.PI) * reach * 0.85;
-        uB = Math.sin(a) * reach * 0.85;
-        bob = Math.abs(Math.cos(a)) * (run ? 0.06 : 0.025);
+        a.tF = Math.sin(ph) * reach + (run ? 0.18 : 0.05);
+        a.tB = Math.sin(ph + Math.PI) * reach * (1 - 0.35 * w) + (run ? 0.18 : 0.05);
+        a.sF = -Math.max(0, Math.cos(ph) * (run ? 1.55 : 0.85)) - 0.14;
+        a.sB = -Math.max(0, Math.cos(ph + Math.PI) * (run ? 1.55 : 0.85)) * (1 - 0.3 * w) - 0.14;
+        a.uF = Math.sin(ph + Math.PI) * reach * 0.85;
+        a.uB = Math.sin(ph) * reach * 0.85;
+        bob = Math.abs(Math.cos(ph)) * (run ? 0.05 : 0.02) + Math.max(0, Math.sin(ph)) * 0.04 * w;
     }
     if (pose === 'climb') {
         u.phase += dt * 11 * Math.sign(p.climbing || 1);
         const c = Math.sin(u.phase);
-        uF += c * 0.4;
-        uB -= c * 0.4;
-        tF -= c * 0.35;
-        tB += c * 0.35;
+        a.uF += c * 0.4;
+        a.uB -= c * 0.4;
+        a.tF -= c * 0.35;
+        a.tB += c * 0.35;
     }
-    const breath = pose === 'idle' ? Math.sin(t * 2.3) : 0;
+    const breath = pose === 'idle' ? Math.sin(t * (2.3 + 2.5 * w)) * (1 + 2 * w) : 0;
+    a.head += w * 0.3 + (pose === 'idle' ? Math.sin(t * 1.1) * 0.025 + breath * 0.02 : 0);
+    a.lean += w * 0.1;
+    a.uB = a.uB + (-0.35 - a.uB) * 0.7 * w;
+    a.lB = a.lB + (1.7 - a.lB) * 0.7 * w;
 
-    const squash = p.squash ?? 1;
-    if (p.squash !== undefined) p.squash += (1 - p.squash) * Math.min(1, dt * 14);
-    u.body.scale.set(1 / Math.max(0.6, squash), squash, 1);
-    u.hip.position.y = cur.hip + bob + breath * 0.006;
-
-    let lean = cur.lean;
-    if (pose === 'dash' && p.dashDir && p.dashDir.y !== 0) lean = 1.2 * Math.abs(p.dashDir.x) + (p.dashDir.y > 0 ? -0.35 : 0.8);
-    u.hip.rotation.z = -lean;
-    if (pose === 'spin') u.spinAngle += dt * 20;
-    else u.spinAngle = 0;
-    u.body.rotation.z = u.spinAngle ? -u.spinAngle : 0;
-
-    u.upper.rotation.z = -Math.sin(u.phase) * (pose === 'run' ? 0.08 : 0) + breath * 0.012;
-    u.legF.a.rotation.z = tF + lean;
-    u.legF.b.rotation.z = sF;
-    u.legB.a.rotation.z = tB + lean;
-    u.legB.b.rotation.z = sB;
     if (p.casting > 0) {
         p.casting -= dt;
         const c = Math.min(1, p.casting * 6);
-        if (pose !== 'grab' && pose !== 'climb') uF += (1.55 - uF) * c;
+        if (pose !== 'grab' && pose !== 'climb') a.uF += (1.55 - a.uF) * c;
     }
-    u.armF.a.rotation.z = uF;
-    u.armF.b.rotation.z = cur.lF;
-    u.armB.a.rotation.z = uB;
-    u.armB.b.rotation.z = cur.lB;
-    u.head.rotation.z = cur.head + lean * 0.65 + (pose === 'idle' ? Math.sin(t * 1.1) * 0.025 : 0);
 
-    const facing = flipScale >= 0 ? 1 : -1;
-    const vx = (p.vx || 0) * facing;
-    const vy = p.vy || 0;
-    const wind = Math.sin(t * 2.2) * 0.05 + Math.sin(t * 5.3) * 0.02;
-    const want = Math.max(-1.4, Math.min(1.6, -vx * -0.13 + Math.max(-1, Math.min(1, vy * 0.05)) * -0.5)) + wind;
-    u.cloak.forEach((seg, i) => {
-        const goal = (i === 0 ? want : want * 0.45) + lean * (i === 0 ? 0.9 : 0);
-        const spring = (goal - u.cloakA[i]) * 70 - u.cloakV[i] * 11;
-        u.cloakV[i] += spring * dt;
-        u.cloakA[i] += u.cloakV[i] * dt;
-        seg.rotation.z = -u.cloakA[i] + Math.sin(t * 4.4 + i) * 0.02;
-    });
-    const hairGoal = Math.max(-1.2, Math.min(1.3, vx * 0.11 - vy * 0.04)) + Math.sin(t * 3.6) * 0.06;
-    u.lockV += ((hairGoal - u.lockAngle) * 90 - u.lockV * 12) * dt;
-    u.lockAngle += u.lockV * dt;
-    u.lockA.rotation.z = -u.lockAngle;
-    u.lockB.rotation.z = -u.lockAngle * 0.6;
+    const balling = pose === 'spin';
+    u.ball = damp(u.ball, balling ? 1 : 0, Math.min(1, dt * (balling ? 24 : 9)));
+    if (balling) u.spinAngle += dt * SPIN_SPEED;
+    else if (u.spinAngle > 0) {
+        const goal = Math.ceil(u.spinAngle / (Math.PI * 2) - 1e-4) * Math.PI * 2;
+        u.spinAngle = Math.min(goal, u.spinAngle + Math.max(4, (goal - u.spinAngle) * 12) * dt);
+        if (u.spinAngle >= goal - 1e-4) u.spinAngle = 0;
+    }
+    u.spin.rotation.z = -u.spinAngle * facing;
+    u.spin.scale.setScalar(1 - 0.18 * u.ball);
+    u.ring.visible = u.ball > 0.05;
+    u.ring.material.opacity = u.ball * (balling ? 0.6 : 0.3);
+    u.ring.rotation.z -= dt * 34 * facing;
+    u.ring.scale.setScalar(0.8 + u.ball * 0.2);
+    a.lean *= 1 - u.ball;
+    a.tail = Math.max(-1.1, Math.min(1.1, (p.vx || 0) * facing * 0.07 + (p.vy || 0) * 0.05)) + Math.sin(t * 3.6) * 0.1;
+    a.tail += (-1.6 - a.tail) * u.ball;
+    if (u.ball > 0.01 && !balling) for (const key of POSE_KEYS) a[key] += (POSES.spin[key] - a[key]) * u.ball;
 
-    u.blink -= dt;
-    if (u.blink < -0.11) u.blink = 2.4 + Math.abs(Math.sin(t * 7.3)) * 2.8;
-    u.eyes.visible = u.blink > 0 && pose !== 'hurt';
+    const squash = p.squash ?? 1;
+    if (p.squash !== undefined) p.squash += (1 - p.squash) * Math.min(1, dt * 14);
+    const wide = 1 / Math.max(0.6, squash);
+    u.body.scale.set(wide, squash, wide);
 
-    u.halo.position.x = flipScale * 0.02;
-    const dashesLeft = Math.min(2, Math.max(0, p.dashes ?? 1));
-    u.hairMats.forEach(m => m.color.setHex(HAIR_COLORS[dashesLeft]));
+    let lean = a.lean;
+    if (pose === 'dash' && p.dashDir && p.dashDir.y !== 0) lean = 1.1 * Math.abs(p.dashDir.x) + (p.dashDir.y > 0 ? -0.35 : 0.8);
+    u.hip.rotation.z = -lean * facing;
+    a.tF += lean;
+    a.tB += lean;
+    a.head += lean * 0.65;
+    const base = u.hipY + bob + breath * 0.006;
+    u.hip.position.y = base + u.footFix;
+    poseModel(u, a, facing, t, dt);
+    if (m && GROUNDED.has(pose) && p.onGround !== false && u.ball < 0.05) groundFeet(group, u, base, squash);
+    else u.footFix = damp(u.footFix, 0, Math.min(1, dt * 10));
+
+    if (m && m.byName.pink) {
+        const dashes = Math.min(2, Math.max(0, p.dashes ?? 1));
+        const pad = m.byName.pink.color.copy(m.padBase);
+        if (dashes === 0) pad.lerp(DASH_DRAINED, 0.75);
+        if (dashes === 2) pad.lerp(DASH_FULL, 0.35);
+    }
     u.shadow.visible = p.onGround !== false;
+
     if (pose === 'dash' && group.parent) {
         spawnGhosts(group, u);
         u.ghostT -= dt;
@@ -407,12 +459,7 @@ export function animatePlayer(group, p, pose, dt, t) {
             g.material.opacity = 0.42;
         }
     }
-    u.ghosts.forEach(g => {
-        if (!g.visible) return;
-        g.material.opacity -= dt * 2.4;
-        if (g.material.opacity <= 0) g.visible = false;
-    });
-    group.visible = !p.dead && ((p.iframes || 0) <= 0 || Math.floor(p.iframes * 16) % 2 === 0);
+    group.visible = (p.iframes || 0) <= 0 || Math.floor(p.iframes * 16) % 2 === 0;
 }
 
 export function makeBerry() {

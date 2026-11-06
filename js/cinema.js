@@ -598,6 +598,7 @@ export class Cinema {
         }
         const set = this.set(shot.set);
         set.group.visible = true;
+        if (set.data.hero) E.setPlayerSkin(set.data.hero.model, this.skin);
         this.skyMat.uniforms.top.value.set(set.data.sky[0]);
         this.skyMat.uniforms.bottom.value.set(set.data.sky[1]);
         if (this.view.postMat) this.view.postMat.uniforms.shade.value.set(set.data.sky[0]);

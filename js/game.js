@@ -37,6 +37,7 @@ export class Game {
         this.grid = level.grid;
         E.setChapterArt(level.chapter);
         this.view.build(level);
+        this.view.deathVeil(false);
         this.world = new World(this.grid);
         this.time = resume ? resume.time : 0;
         this.clock = 0;
@@ -149,7 +150,8 @@ export class Game {
         this.player.dashes = this.maxDashes();
         this.spawn = { ...origin };
         if (resume) this.flags.forEach(f => { f.active = f.x === resume.x && f.y === resume.y; });
-        this.playerMesh = E.makePlayer();
+        if (this.playerMesh) E.disposePlayer(this.playerMesh);
+        this.playerMesh = E.makePlayer(Save.data ? Save.data.skins.equipped : undefined);
         root.add(this.playerMesh);
         this.view.setBounds(null);
         this.view.camPos.set(origin.x, origin.y);
@@ -379,14 +381,16 @@ export class Game {
         if (d) {
             d.chapterDeaths[ch - 1]++;
             d.deaths++;
+            Save.chapterDeath(ch);
             Save.save();
         }
         if (this.boss && this.boss.fighting) this.bossDamageTaken = true;
         Sfx.die();
         this.shake(0.8);
-        this.view.emit(p.x, p.y + 0.5, 0xff3b3b, 40, 9, 0.9);
-        this.view.emit(p.x, p.y + 0.5, 0xffffff, 15, 6, 0.7);
-        this.playerMesh.visible = false;
+        this.view.emit(p.x, p.y + 0.6, 0xffffff, 14, 7, 0.35);
+        this.view.emit(p.x, p.y + 0.6, 0xff5a5a, 10, 4, 0.5);
+        this.view.deathVeil(true);
+        this.deathMotes = 0;
         if (d) {
             if (d.deaths === 1) this.unlock('first_death');
             if (d.deaths >= 10) this.unlock('die_10');
@@ -408,6 +412,7 @@ export class Game {
         resetPlayerMotion(p, this.maxDashes());
         this.abilities.onRespawn();
         this.playerMesh.visible = true;
+        this.view.deathVeil(false);
         this.view.spawnPop();
         this.crumbles.forEach(c => {
             c.broken = 0;
@@ -469,6 +474,14 @@ export class Game {
         this.abilities.update(dt, p);
         if (p.dead) {
             p.deadTimer -= dt;
+            const elapsed = DEATH_TIME - p.deadTimer;
+            if (this.deathMotes === 0 && elapsed > 0.3) {
+                this.deathMotes = 1;
+                this.view.emit(p.x, p.y + 0.7, 0xbfefff, 24, 2.2, 1.1);
+            } else if (this.deathMotes === 1 && elapsed > 0.55) {
+                this.deathMotes = 2;
+                this.view.emit(p.x, p.y + 1.1, 0x7fe3ff, 16, 3, 0.9);
+            }
             if (p.deadTimer <= 0) {
                 if (this.permadeathPending) {
                     this.running = false;
@@ -873,6 +886,7 @@ export class Game {
             this.unlock('ch' + ch + '_complete');
             if (d.chapterDeaths[ch - 1] === 0) this.unlock('no_death_ch' + ch);
         }
+        const skin = d ? Save.finishRunLevel(i, lastOfChapter) : null;
         if (i === LEVELS.length - 1) {
             this.unlock('summit');
             this.unlock('summit_complete');
@@ -898,7 +912,8 @@ export class Game {
             record,
             lastOfChapter,
             last: i === LEVELS.length - 1,
-            newAbilities: this.newAbilities
+            newAbilities: this.newAbilities,
+            skin
         };
         this.completeTimer = COMPLETE_DELAY;
     }

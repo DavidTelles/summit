@@ -41,6 +41,7 @@ export function fakeView() {
         flash() {},
         setDim() {},
         slash() {},
+        deathVeil() {},
         damageFlash() {},
         spawnPop() {},
         updateParticles() {}
