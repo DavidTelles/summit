@@ -22,7 +22,7 @@ const stored = slot => JSON.parse(localStorage.getItem(`summit_slot_${slot}`));
 
 test('capítulos batem com as fases do jogo', () => {
     for (const [ch, list] of Object.entries(CHAPTERS)) list.forEach(i => assert.equal(LEVELS[i].chapter, +ch));
-    assert.equal(LEVELS.length, 12);
+    assert.equal(LEVELS.length, 18, '12 fases da montanha + 3 do Inferno + 3 do Céu');
     for (const ch of [1, 2, 3]) assert.ok(skinForChapter(ch), `skin do capítulo ${ch}`);
     assert.equal(new Set(SKINS.map(s => s.id)).size, SKINS.length);
 });

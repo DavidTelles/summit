@@ -1,6 +1,8 @@
 import { Grid } from './grid.js';
 import { CHAPTER_2 } from './chapter2.js';
 import { CHAPTER_3 } from './chapter3.js';
+import { CHAPTER_4 } from './chapter4.js';
+import { CHAPTER_5 } from './chapter5.js';
 
 function level1() {
     const g = new Grid(84, 26);
@@ -22,6 +24,8 @@ function level2() {
     g.fill(0, 0, 12, 1, '#').fill(17, 0, 22, 1, '#');
     g.fill(27, 0, 27, 12, '#').fill(28, 0, 40, 1, '#');
     g.fill(34, 5, 36, 5, '#').fill(40, 0, 43, 14, '#');
+    // Piso rachado sobre a Galeria Soterrada: no mundo aberto, só cede à Pancada no Chão.
+    g.fill(35, 0, 36, 0, '.').fill(35, 1, 36, 1, 'Y');
     g.fill(44, 0, 56, 1, '#').fill(46, 8, 48, 8, '#');
     g.fill(51, 2, 53, 2, '^').fill(60, 0, 70, 1, '#');
     g.fill(60, 2, 70, 2, '^').fill(58, 5, 59, 5, '#').fill(62, 8, 64, 8, '#').fill(67, 11, 69, 11, '#');
@@ -57,6 +61,8 @@ function level4() {
     g.fill(0, 0, 10, 1, '#');
     g.fill(14, 3, 16, 3, '#').fill(20, 6, 22, 6, '#').fill(26, 9, 28, 9, '#').fill(32, 12, 34, 12, '#');
     g.fill(38, 12, 40, 30, '#').fill(46, 12, 48, 12, '#').fill(42, 16, 44, 16, '#');
+    // Topo do pilar: entrada da Fenda dos Ecos.
+    g.fill(41, 30, 44, 30, '#');
     g.fill(52, 12, 70, 13, '#').fill(56, 14, 56, 14, '^').fill(62, 14, 62, 14, '^');
     g.fill(74, 14, 76, 14, '#').fill(80, 17, 82, 17, '#').fill(86, 20, 88, 20, '#');
     g.fill(92, 20, 109, 21, '#').fill(96, 22, 98, 22, '^');
@@ -90,4 +96,4 @@ function level5() {
         arena: { x1: 122, x2: 153, floor: 30, ceil: 47, gateX: 121, triggerX: 125, spawnX: 124, entryX: 111.5, zoom: 25 } };
 }
 
-export const LEVELS = [level1(), level2(), level3(), level4(), level5(), ...CHAPTER_2, ...CHAPTER_3];
+export const LEVELS = [level1(), level2(), level3(), level4(), level5(), ...CHAPTER_2, ...CHAPTER_3, ...CHAPTER_4, ...CHAPTER_5];

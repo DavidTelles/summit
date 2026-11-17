@@ -76,8 +76,11 @@ test('desbloqueio progressivo: começa só com Onda de Choque e avança com a ca
     assert.ok(Save.data.abilities.energy_shield);
     assert.ok(hooks.includes('energy_shield'));
     assert.ok(game.completeResult.newAbilities.some(a => a.id === 'energy_shield'));
-    assert.ok(Save.data.abilities.last_stand, 'concluir sem morrer libera Última Chance');
+    assert.ok(!Save.data.abilities.last_stand, 'Última Chance não depende mais de conquista: vem com o Capítulo 1');
     assert.ok(!Save.data.abilities.recall);
+    Save.data.completedChapters.push(1);
+    game.syncProgress();
+    assert.ok(Save.data.abilities.last_stand, 'concluir o Capítulo 1 libera Última Chance');
 });
 
 test('migração v2: mantém recordes e checkpoint, concede habilidades pelo histórico e não equipa nada à força', () => {
@@ -87,7 +90,7 @@ test('migração v2: mantém recordes e checkpoint, concede habilidades pelo his
         achievements: { boss1: true }, completedChapters: [1],
         checkpoint: { level: 6, x: 10, y: 4, time: 3 }
     });
-    assert.equal(d.version, 4);
+    assert.equal(d.version, 7);
     assert.ok(d.best[5], 'recorde de fase redesenhada preservado');
     assert.deepEqual(d.checkpoint, { level: 6, x: 10, y: 4, time: 3 });
     for (const id of ['shockwave', 'energy_shield', 'long_dash', 'heal', 'perception', 'recall', 'air_burst', 'perfect_dodge', 'glide']) assert.ok(d.abilities[id], id);
@@ -578,21 +581,15 @@ test('Tempo Suspenso: mundo desacelera e jogador não', () => {
     assert.ok(clock >= 0);
 });
 
-test('Forma do Cume: imune a golpes, toque derrota, dashes ilimitados; não evita espinhos', () => {
-    const { game } = setup(0, { summit_form: 1 });
+test('Forma do Cume removida: save antigo com ela carrega limpo e libera o espaço do loadout', () => {
+    assert.equal(ABILITIES.some(a => a.id === 'summit_form'), false);
+    const d = sanitizeSave({ version: 4, unlocked: 12, abilities: { summit_form: 3, shockwave: 2 }, loadout: ['summit_form', 'shockwave'] });
+    assert.equal('summit_form' in d.abilities, false);
+    assert.deepEqual(d.loadout, ['shockwave']);
+    const { game } = setup(0, { shockwave: 1 });
     const p = game.player;
-    cast(game);
     game.hurtPlayer(1, p.x - 1);
-    assert.equal(p.hp, PLAYER_HP);
-    p.dashes = 0;
-    run(game, 0.02);
-    assert.ok(p.dashes >= 1);
-    const e = game.enemies[0];
-    placeNear(game, e, 0.2);
-    run(game, 0.05);
-    assert.equal(e.alive, false);
-    game.kill('spike');
-    assert.equal(p.dead, true);
+    assert.equal(p.hp, PLAYER_HP - 1, 'nada mais deixa o jogador imune por toque');
 });
 
 test('morte limpa efeitos e recargas e a fase continua jogável', () => {
@@ -653,23 +650,24 @@ test('controles: troca de tecla vale no jogo, troca conflito e recusa reservadas
     Save.data.achievements = {};
 });
 
-test('checkpoint: rejogar fase antiga não apaga o checkpoint da fase mais avançada', () => {
+test('checkpoint: no mundo aberto vale o último tocado, e atravessar a saída não apaga o save', () => {
     const { game } = newGame(5);
     settleAt(game, 5);
     const cp = Save.data.checkpoint;
     assert.equal(cp.level, 5);
+    game.complete();
+    assert.deepEqual(Save.data.checkpoint, cp, 'sair da fase não apaga o checkpoint');
     const old = new Game(fakeView(), { onHud() {}, onComplete() {} }, new FakeInput());
     old.load(1);
     const flag = old.flags[0];
     old.player.x = flag.x;
     old.player.y = flag.y + 0.1;
     old.step(STEP);
-    assert.deepEqual(Save.data.checkpoint, cp, 'bandeira de fase antiga não sobrescreve');
-    old.complete();
-    assert.deepEqual(Save.data.checkpoint, cp, 'concluir fase antiga não apaga');
-    assert.equal(continueLevel(Save.data), 5);
-    assert.ok(resumeFor(Save.data, 5));
-    assert.equal(resumeFor(Save.data, 1), null);
+    assert.equal(Save.data.checkpoint.level, 1, 'voltar e tocar uma bandeira antiga salva lá');
+    assert.equal(continueLevel(Save.data), 1);
+    assert.ok(resumeFor(Save.data, 1));
+    assert.equal(resumeFor(Save.data, 5), null);
+    assert.ok(Object.values(Save.data.world.flags).some(f => f.level === 5), 'a bandeira antiga continua como ponto de viagem');
 });
 
 function settleAt(game, index) {
@@ -686,7 +684,7 @@ test('central: status das fases, progresso e exploração usam dados reais do sa
     assert.equal(levelStatus(d, 0), 'done');
     assert.equal(levelStatus(d, 5), 'open');
     assert.equal(levelStatus(d, 6), 'locked');
-    assert.deepEqual(campaignProgress(d), { done: 5, total: 12, pct: 42 });
+    assert.deepEqual(campaignProgress(d), { done: 5, total: LEVELS.length, pct: Math.round((5 / LEVELS.length) * 100) });
     assert.equal(continueLevel(d), 5);
     assert.equal(exploration(d).secrets, 0);
     d.secrets['5:valley'] = true;
@@ -694,11 +692,11 @@ test('central: status das fases, progresso e exploração usam dados reais do sa
     const ex = exploration(d);
     assert.equal(ex.secrets, 1);
     assert.equal(ex.berries, 6);
-    assert.equal(TOTAL_SECRETS, 6);
+    assert.equal(TOTAL_SECRETS, 7, '6 das fases + a Galeria Soterrada');
     assert.ok(ex.pct > 0);
     assert.ok(levelObjectives(4).some(o => o.text.includes('Caçador')));
     assert.ok(levelRewards(sanitizeSave({ unlocked: 5 }), 4).some(r => r.text.includes('Retorno')));
-    assert.deepEqual(achievementProgress('stomp_5', { stomps: 2 }), [2, 5]);
+    assert.deepEqual(achievementProgress('stomp_100', { stomps: 2 }), [2, 100]);
     assert.ok(ACHIEVEMENTS.every(a => a.icon && a.name && a.desc));
 });
 

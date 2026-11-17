@@ -1,18 +1,29 @@
 import { CHAPTER_THREAD, RECORDS, RECORD_KINDS, SCENE_INFO, TOTAL_RECORDS, recordById, recordsFound } from './story.js';
 import { LEVELS } from './levels.js';
-import { ACHIEVEMENTS, Save, SKILLS, achievementProgress } from './core.js';
-import { ABILITIES, CATEGORIES, LOADOUT_SIZE, TYPE_LABEL, abilityById, meetsReq, reqProgress, reqText } from './abilities.js';
+import { ACHIEVEMENTS, Save, SKILLS, achievementProgress, maxedAbilityCount } from './core.js';
+import { ABILITIES, CATEGORIES, LOADOUT_SIZE, abilityById } from './abilities.js';
 import {
-    BOSSES, CHAPTER_DESC, CHAPTER_NAMES, DIFFICULTY, TOTAL_BERRIES, TOTAL_SECRETS, campaignProgress, chapterLevels, chapterProgress,
-    continueLevel, defeatedBosses, exploration, levelFacts, levelObjectives, levelRewards, levelStatus, resumeFor
+    BOSSES, CHAPTER_NAMES, TOTAL_BERRIES, TOTAL_SECRETS, campaignProgress,
+    continueLevel, continueRoom, defeatedBosses, exploration, levelFacts, levelStatus
 } from './campaign.js';
 import { icon } from './icons.js';
 import { Sfx } from './audio.js';
+import { ACHIEVEMENT_GROUPS } from './achievements.js';
+import { abilityCard as card, abilityDetail as detail, loadoutSlots as slots } from './abilityUI.js';
+import { mapSummary, renderMap, travelPoints } from './mapView.js';
+import { ROOMS } from './worldMap.js';
+import { CHAPTERS, REALMS, realmChapters, realmOfChapter } from './realms.js';
 
 const $ = id => document.getElementById(id);
+// Rótulos da trilha da central em cada reino: na montanha e no Céu se sobe, no Inferno se desce.
+const TRAIL = {
+    montanha: { from: 'Base', to: 'Cume', finished: 'A montanha está em silêncio. O que resta é explorar o que ficou.' },
+    inferno: { from: 'Portões', to: 'Trono', finished: 'O Fundo está em silêncio. Acima, o Alto continua olhando.' },
+    ceu: { from: 'Limiar', to: 'Trono', finished: 'Ninguém responde lá de cima. Agora o caminho é seu, em qualquer direção.' }
+};
 const TABS = [
     { id: 'home', label: 'Início', icon: 'home' },
-    { id: 'chapters', label: 'Capítulos', icon: 'route' },
+    { id: 'map', label: 'Mapa', icon: 'map' },
     { id: 'abilities', label: 'Habilidades', icon: 'spark' },
     { id: 'records', label: 'Registros', icon: 'scroll' },
     { id: 'achievements', label: 'Conquistas', icon: 'trophy' },
@@ -40,34 +51,25 @@ export const fmtLong = t => {
 };
 
 const modeTag = d => `<span class="tag ${d.mode === 'permadeath' ? 'tag-danger' : ''}">${d.mode === 'permadeath' ? `${icon('skull')} Morte Súbita` : 'Normal'}</span>`;
-const pips = (level, max) => `<span class="pips" aria-label="Nível ${level} de ${max}">${Array.from({ length: max }, (_, i) => `<i class="${i < level ? 'on' : ''}"></i>`).join('')}</span>`;
 const meter = (pct, cls = '') => `<div class="meter ${cls}"><i style="width:${Math.min(100, pct)}%"></i></div>`;
-const difficulty = n => `<span class="pips diff" aria-hidden="true">${Array.from({ length: 5 }, (_, i) => `<i class="${i < n ? 'on' : ''}"></i>`).join('')}</span>`;
-const seconds = v => `${String(v).replace('.', ',')} s`;
 
-function abilityFacts(a, stats) {
-    const list = [`<span>${icon(a.type === 'passive' ? 'spark' : 'bolt2')} ${TYPE_LABEL[a.type]}</span>`];
-    if (stats.cooldown) list.push(`<span>${icon('cooldown')} Recarga ${seconds(stats.cooldown)}</span>`);
-    if (stats.duration) list.push(`<span>${icon('clock')} Dura ${seconds(stats.duration)}</span>`);
-    if (stats.cost) list.push(`<span>${icon('wind')} Custa ${stats.cost} de fôlego</span>`);
-    return `<div class="ab-facts">${list.join('')}</div>`;
-}
+const BOSS_LORE_RECORDS = { boss1: ['varak_champion', 'varak_refusal'], boss2: ['aethos_notebook'], mentor: ['oren_lesson', 'oren_diary'] };
+const knowsBossName = (d, id) => (BOSS_LORE_RECORDS[id] || []).some(r => d.story.records[r]);
 
-function reqLine(req, d) {
-    const ok = meetsReq(req, d);
-    const progress = !ok && reqProgress(req, d);
-    return `<div class="req ${ok ? 'ok' : ''}">${icon(ok ? 'check' : 'lock')}<span>${reqText(req)}${progress ? ` <b>${progress[0]}/${progress[1]}</b>` : ''}</span></div>`;
-}
-
-const knowsBossName = (d, id) => (id === 'boss1' ? d.story.records.varak_champion || d.story.records.varak_refusal : d.story.records.aethos_notebook);
+// Altura de cada fase na trilha da montanha (desenho original, que sobe até o cume).
+const MOUNTAIN_LIFT = [0, 3, 1, 7, 13, 9, 14, 10, 22, 19, 27, 36];
 
 function profileSvg(d) {
     const W = 1000;
     const H = 76;
-    const lift = [0, 3, 1, 7, 13, 9, 14, 10, 22, 19, 27, 36];
-    const points = LEVELS.map((_, i) => {
-        const x = 24 + (i * (W - 48)) / (LEVELS.length - 1);
-        const y = H - 12 - ((i / (LEVELS.length - 1)) * 18 + lift[i]);
+    const chapters = realmChapters(d.realm);
+    const indices = LEVELS.map((l, i) => i).filter(i => chapters.includes(LEVELS[i].chapter));
+    const n = Math.max(1, indices.length - 1);
+    const descending = d.realm === 'inferno';
+    const points = indices.map((i, k) => {
+        const x = 24 + (k * (W - 48)) / n;
+        const rise = descending ? (k / n) * 54 + (k % 2) * 4 : (k / n) * 18 + (MOUNTAIN_LIFT[k] || 0);
+        const y = descending ? 12 + rise : H - 12 - rise;
         return { x, y, status: levelStatus(d, i), i };
     });
     const line = list => list.map((p, i) => `${i ? 'L' : 'M'}${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join('');
@@ -86,63 +88,11 @@ function profileSvg(d) {
 }
 
 export function createHub(ctx) {
-    const ui = { tab: 'home', filter: 'all', ability: 'shockwave', chapter: 1, prep: null, prepFocus: null, hero: null, heroTried: false };
+    const ui = { tab: 'home', filter: 'all', ability: 'shockwave', hero: null, heroTried: false };
 
-    function loadoutSlots(removable) {
-        const d = Save.data;
-        const cells = [];
-        for (let i = 0; i < LOADOUT_SIZE; i++) {
-            const a = abilityById(d.loadout[i]);
-            if (a) {
-                cells.push(`<button class="slot filled cat-${a.category}" data-act="slot-remove" data-arg="${a.id}" title="Remover ${a.name}" ${removable ? '' : 'tabindex="-1"'}>
-                    <span class="slot-ic">${icon(a.icon)}</span><span class="slot-name">${a.name}</span>${removable ? `<span class="slot-x">${icon('close')}</span>` : ''}</button>`);
-            } else {
-                cells.push(`<div class="slot empty"><span class="slot-ic">${i + 1}</span><span class="slot-name">Espaço livre</span></div>`);
-            }
-        }
-        return cells.join('');
-    }
-
-    function abilityCard(a, acting) {
-        const d = Save.data;
-        const level = d.abilities[a.id];
-        const equipped = d.loadout.includes(a.id);
-        const ready = level && Save.canUpgrade(a.id);
-        const state = !level ? 'locked' : equipped ? 'equipped' : 'open';
-        const selected = (acting === 'ability-pick' ? ui.ability : ui.prepFocus) === a.id;
-        return `<button class="ab-card ${state} ${selected ? 'selected' : ''} cat-${a.category}" data-act="${acting}" data-arg="${a.id}" data-ability="${a.id}" aria-pressed="${equipped}">
-            <span class="ab-ic">${icon(level ? a.icon : 'lock')}</span>
-            <span class="ab-text"><b>${a.name}</b><small>${level ? `Nível ${level}` : 'Bloqueada'}${ready ? ' · pode evoluir' : ''}</small></span>
-            ${equipped ? `<span class="ab-mark">${icon('check')}</span>` : ''}
-        </button>`;
-    }
-
-    function abilityDetail(id, withUpgrade) {
-        const d = Save.data;
-        const a = abilityById(id);
-        const category = CATEGORIES.find(c => c.id === a.category);
-        const level = d.abilities[a.id] || 0;
-        const stats = a.levels[Math.max(0, level - 1)];
-        const next = level ? a.levels[level] : null;
-        const equipped = d.loadout.includes(a.id);
-        const head = `<div class="detail-head cat-${a.category}">
-            <span class="detail-ic">${icon(level ? a.icon : 'lock')}</span>
-            <div><small>${category.name}</small><h3>${a.name}</h3>${pips(level, a.levels.length)}</div>
-        </div>`;
-        const body = `<p class="detail-desc">${a.desc}</p>${abilityFacts(a, stats)}`;
-        if (!level) {
-            return `${head}${body}<div class="detail-block"><small>Como desbloquear</small>${reqLine(a.unlock, d)}</div>
-                <div class="detail-block"><small>Efeito inicial</small><p>${a.levels[0].text}</p></div>`;
-        }
-        const upgrade = next ? `<div class="detail-block upgrade">
-                <small>Próximo nível: ${level + 1}</small><p>${next.text}</p>${reqLine(next.req, d)}
-                ${withUpgrade ? `<button class="btn ${Save.canUpgrade(a.id) ? 'btn-primary' : ''}" data-act="ability-upgrade" data-arg="${a.id}" ${Save.canUpgrade(a.id) ? '' : 'disabled'}>${icon('spark')} Evoluir para nível ${level + 1}</button>` : ''}
-            </div>` : '<div class="detail-block"><small>Evolução</small><p>Nível máximo alcançado.</p></div>';
-        const toggle = withUpgrade
-            ? `<button class="btn" data-act="ability-toggle" data-arg="${a.id}">${icon(equipped ? 'close' : 'check')} ${equipped ? 'Remover da próxima fase' : 'Equipar para a próxima fase'}</button>`
-            : '';
-        return `${head}${body}<div class="detail-block"><small>Nível atual: ${level}</small><p>${stats.text}</p></div>${upgrade}${toggle}`;
-    }
+    const loadoutSlots = removable => slots(Save.data, { removable });
+    const abilityCard = (a, act) => card(Save.data, a, { act, selected: ui.ability === a.id });
+    const abilityDetail = (id, withUpgrade) => detail(Save.data, id, { upgrade: withUpgrade, toggle: withUpgrade });
 
     const PANELS = {
         home() {
@@ -150,7 +100,9 @@ export function createHub(ctx) {
             const index = continueLevel(d);
             const f = levelFacts(index);
             const progress = campaignProgress(d);
-            const resume = resumeFor(d, index);
+            const point = continueRoom(d);
+            const resume = point.resume;
+            const started = d.totalTime > 0 || d.unlocked > 1 || !!resume;
             const unlocked = Object.keys(d.abilities).length;
             const upgrades = ABILITIES.filter(a => d.abilities[a.id] && Save.canUpgrade(a.id)).length;
             const achieved = Object.keys(d.achievements).length;
@@ -160,20 +112,20 @@ export function createHub(ctx) {
                 <div class="home-left">
                     <small class="kicker">Kael · Capítulo ${f.chapter}</small>
                     <h1 class="home-title">${CHAPTER_NAMES[f.chapter]}</h1>
-                    <p class="home-thread">${finished ? 'A montanha está em silêncio. O que resta é explorar o que ficou.' : CHAPTER_THREAD[f.chapter]}</p>
+                    <p class="home-thread">${finished ? TRAIL[d.realm].finished : CHAPTER_THREAD[f.chapter]}</p>
                     <div class="home-progress"><b>${progress.pct}%</b><span>da campanha · ${progress.done} de ${progress.total} fases</span>${meter(progress.pct)}</div>
                     <button class="btn btn-primary btn-hero" data-act="hub-continue" id="btn-continue">
-                        ${icon('play')}<span><b>${finished ? 'Rejogar última fase' : resume ? 'Retomar jornada' : 'Continuar jornada'}</b><small>Fase ${index + 1} · ${f.name}${resume ? ' · do checkpoint' : ''}</small></span>
+                        ${icon('play')}<span><b>${started ? 'Continuar' : 'Começar jornada'}</b><small>${ROOMS[point.room].name}${resume ? ' · último checkpoint' : ''}</small></span>
                     </button>
                     <div class="home-loadout">
-                        <small class="kicker-soft">Equipadas para a próxima fase</small>
+                        <small class="kicker-soft">Habilidades equipadas · troque a qualquer momento no inventário (Tab)</small>
                         <div class="mini-slots">${[0, 1, 2].map(i => {
                             const a = abilityById(d.loadout[i]);
                             return a ? `<span class="mini-slot cat-${a.category}" title="${a.name}">${icon(a.icon)}</span>` : '<span class="mini-slot empty"></span>';
                         }).join('')}</div>
                     </div>
                 </div>
-                <div class="home-hero"><div id="hero-slot"></div></div>
+                <div class="home-hero"><div id="hero-slot"></div><span class="showcase-hint">Clique duas vezes para trocar a skin</span></div>
                 <div class="home-right">
                     <button class="shortcut" data-act="hub-tab" data-arg="abilities">${icon('spark')}<span><b>${unlocked}<i>/${ABILITIES.length}</i></b><small>Habilidades${upgrades ? ` · ${upgrades} para evoluir` : ''}</small></span></button>
                     <button class="shortcut" data-act="hub-tab" data-arg="achievements">${icon('trophy')}<span><b>${achieved}<i>/${ACHIEVEMENTS.length}</i></b><small>Conquistas</small></span></button>
@@ -184,35 +136,29 @@ export function createHub(ctx) {
                     </div>
                 </div>
                 <div class="home-trail">
-                    <div class="trail-labels"><span>Base</span><span>Última fase alcançada: <b>${d.unlocked}. ${LEVELS[d.unlocked - 1].name}</b></span><span>Cume</span></div>
+                    <div class="trail-labels"><span>${TRAIL[d.realm].from}</span><span>${REALMS[d.realm].name} · última fase alcançada: <b>${d.unlocked}. ${LEVELS[d.unlocked - 1].name}</b></span><span>${TRAIL[d.realm].to}</span></div>
                     ${profileSvg(d)}
                 </div>
             </div>`;
         },
-        chapters() {
+        map() {
             const d = Save.data;
-            const tabs = [1, 2, 3].map(ch => {
-                const p = chapterProgress(d, ch);
-                return `<button class="chapter-tab ch-${ch} ${ui.chapter === ch ? 'selected' : ''} ${p.open ? '' : 'locked'}" data-act="chapter-pick" data-arg="${ch}" aria-pressed="${ui.chapter === ch}">
-                    <small>Capítulo ${ch}</small><b>${CHAPTER_NAMES[ch]}</b>
-                    <span class="chapter-meta">${p.open ? `${p.done}/${p.total} fases` : `${icon('lock')} Bloqueado`}</span>${meter(p.pct)}
-                </button>`;
-            }).join('');
-            const cards = chapterLevels(ui.chapter).map(f => {
-                const status = levelStatus(d, f.index);
-                const b = d.best[f.index];
-                const meta = status === 'locked'
-                    ? `Conclua a fase ${f.index} para liberar`
-                    : b ? `${icon('clock')} ${fmtTime(b.time)} &nbsp; ${icon('berry', 'red')} ${Math.min(b.berries, f.berries)}/${f.berries}` : `${icon('berry', 'red')} ${f.berries} morangos para encontrar`;
-                return `<button class="level-tile ${status}" data-act="open-level" data-arg="${f.index}" ${status === 'locked' ? 'aria-disabled="true"' : ''}>
-                    <span class="level-num">${f.index + 1}</span>
-                    <span class="level-body"><b>${f.name}</b><small>${meta}</small></span>
-                    <span class="level-side">${f.boss ? `<span class="tag tag-boss">${icon('boss')} Chefe</span>` : ''}<span class="status ${status}">${icon(STATUS[status].icon)} ${STATUS[status].label}</span></span>
-                </button>`;
-            }).join('');
-            return `<div class="chapter-tabs">${tabs}</div>
-                <p class="chapter-desc">${CHAPTER_DESC[ui.chapter]}</p>
-                <div class="level-list">${cards}</div>`;
+            const cp = d.checkpoint;
+            const here = cp ? { room: cp.level, x: cp.x, y: cp.y } : null;
+            const points = travelPoints(d);
+            const cpKey = cp ? `${cp.level}:${cp.x},${cp.y}` : null;
+            const list = points.length
+                ? points.map(p => `<button class="travel-row realm-${p.realm} ${p.key === cpKey ? 'here' : ''}" data-act="map-travel" data-arg="${p.key}">${icon('flag')}<span><b>${p.name}</b><small>${p.key === cpKey ? 'Último save' : 'Viajar para cá'}</small></span></button>`).join('')
+                : '<p class="empty-note">Toque nas bandeiras pelo caminho: cada uma salva o jogo e vira um ponto de viagem.</p>';
+            const realms = mapSummary(d).map(r => `<span class="map-realm realm-${r.id}"><b>${r.seen}<i>/${r.total}</i></b><small>${r.name}</small></span>`).join('');
+            return `<div class="map-layout">
+                <div class="map-main">
+                    <div class="map-head"><span>Salas exploradas</span><div class="map-realms">${realms}</div></div>
+                    ${renderMap(d, { here, travel: true, restKey: null })}
+                    <p class="map-legend">${icon('flag')} checkpoint (clique para viajar) · ${icon('boss')} guardião · ${icon('check')} guardião derrotado · contorno tracejado: área ainda não explorada</p>
+                </div>
+                <aside class="travel-list"><small class="kicker-soft">Viagem rápida</small>${list}</aside>
+            </div>`;
         },
         abilities() {
             const d = Save.data;
@@ -225,7 +171,7 @@ export function createHub(ctx) {
             }).join('');
             return `<div class="abilities">
                 <div class="abilities-main">
-                    <div class="equipped-row"><span class="slots-count"><b>${d.loadout.length}/${LOADOUT_SIZE}</b> equipadas para a próxima fase</span><div class="slots">${loadoutSlots(true)}</div></div>
+                    <div class="equipped-row"><span class="slots-count"><b>${d.loadout.length}/${LOADOUT_SIZE}</b> equipadas · também dá para trocar durante o jogo (Tab)</span><div class="slots">${loadoutSlots(true)}</div></div>
                     <div class="chips">${filters}</div>
                     <div class="ab-grid">${list.map(a => abilityCard(a, 'ability-pick')).join('')}</div>
                     <div class="base-moves"><small class="kicker-soft">Movimentos base: sempre ativos, não ocupam espaço</small><div>${base}</div></div>
@@ -236,7 +182,7 @@ export function createHub(ctx) {
         achievements() {
             const d = Save.data;
             const done = ACHIEVEMENTS.filter(a => d.achievements[a.id]).length;
-            const cards = ACHIEVEMENTS.map(a => {
+            const card = a => {
                 const ok = d.achievements[a.id];
                 const hidden = !ok && a.secret;
                 const progress = !ok && achievementProgress(a.id, d);
@@ -246,9 +192,14 @@ export function createHub(ctx) {
                     ${progress ? `<span class="ach-progress">${meter((progress[0] / progress[1]) * 100)}<em>${progress[0]}/${progress[1]}</em></span>` : ''}</span>
                     ${ok ? `<span class="ach-done" title="Obtida">${icon('check')}</span>` : ''}
                 </div>`;
+            };
+            const groups = ACHIEVEMENT_GROUPS.map(g => {
+                const list = ACHIEVEMENTS.filter(a => a.group === g.id);
+                const got = list.filter(a => d.achievements[a.id]).length;
+                return `<small class="kicker-soft ach-group">${g.name} · ${got}/${list.length}</small><div class="ach-grid">${list.map(card).join('')}</div>`;
             }).join('');
             return `<div class="section-head"><b class="big">${done}<i>/${ACHIEVEMENTS.length}</i></b><span>conquistas obtidas nesta campanha</span>${meter((done / ACHIEVEMENTS.length) * 100)}</div>
-                <div class="ach-grid">${cards}</div>`;
+                ${groups}`;
         },
         stats() {
             const d = Save.data;
@@ -261,13 +212,14 @@ export function createHub(ctx) {
                 ${tile('clock', fmtLong(d.totalTime), 'Tempo total de jogo')}
                 ${tile('skull', d.deaths, 'Mortes')}
                 ${tile('flag', `${progress.done}<i>/${progress.total}</i>`, 'Fases concluídas')}
-                ${tile('boss', `${bosses.length}<i>/3</i>`, 'Chefes derrotados')}
+                ${tile('boss', `${bosses.length}<i>/${Object.keys(BOSSES).length}</i>`, 'Chefes derrotados')}
                 ${tile('eye', `${ex.secrets}<i>/${TOTAL_SECRETS}</i>`, 'Segredos encontrados')}
-                ${tile('berry', `${ex.berries}<i>/${TOTAL_BERRIES}</i>`, 'Morangos nas melhores marcas')}
+                ${tile('berry', `${ex.berries}<i>/${TOTAL_BERRIES}</i>`, 'Morangos encontrados')}
+                ${tile('map', `${Object.keys(d.world.visited).length}<i>/${ROOMS.length}</i>`, 'Salas visitadas')}
                 ${tile('scroll', `${recordsFound(d)}<i>/${TOTAL_RECORDS}</i>`, 'Registros encontrados')}
             </div>
             <div class="stat-columns">
-                <div class="stat-block"><div class="stat-block-head"><span>Progresso de exploração</span><b>${ex.pct}%</b></div>${meter(ex.pct)}<small>Soma dos segredos encontrados e do melhor número de morangos de cada fase concluída.</small>
+                <div class="stat-block"><div class="stat-block-head"><span>Progresso de exploração</span><b>${ex.pct}%</b></div>${meter(ex.pct)}<small>Soma dos segredos e dos morangos encontrados em todas as salas do mundo, incluindo as opcionais.</small>
                     <ul class="stat-lines">
                         <li>Inimigos derrotados <b>${d.stomps}</b></li>
                         <li>Cristais usados <b>${d.crystals}</b></li>
@@ -277,7 +229,7 @@ export function createHub(ctx) {
                 </div>
                 <div class="stat-block"><div class="stat-block-head"><span>Chefes</span></div><ul class="boss-list">${rows}</ul>
                     <div class="stat-block-head spaced"><span>Mortes por capítulo</span></div>
-                    <ul class="stat-lines">${[1, 2, 3].map(ch => `<li>Capítulo ${ch}: ${CHAPTER_NAMES[ch]} <b>${d.chapterDeaths[ch - 1]}</b></li>`).join('')}</ul>
+                    <ul class="stat-lines">${CHAPTERS.map(ch => `<li>Capítulo ${ch}: ${CHAPTER_NAMES[ch]} <b>${d.chapterDeaths[ch - 1]}</b></li>`).join('')}</ul>
                 </div>
             </div>`;
         },
@@ -287,7 +239,7 @@ export function createHub(ctx) {
             const open = recordById(ui.record);
             const current = open && d.story.records[open.id] ? open : RECORDS.find(r => d.story.records[r.id]) || null;
             ui.record = current ? current.id : null;
-            const groups = [1, 2, 3].map(ch => {
+            const groups = CHAPTERS.filter(ch => RECORDS.some(r => r.chapter === ch)).map(ch => {
                 const rows = RECORDS.filter(r => r.chapter === ch).map(r => {
                     const known = d.story.records[r.id];
                     return known
@@ -367,6 +319,7 @@ export function createHub(ctx) {
         const d = Save.data;
         if (!d) return;
         $('hub').dataset.chapter = levelFacts(continueLevel(d)).chapter;
+        $('hub').dataset.realm = d.realm;
         renderHeader();
         renderNav();
         renderPanel(animate);
@@ -381,7 +334,6 @@ export function createHub(ctx) {
         const d = Save.data;
         if (!d) return false;
         ui.tab = tab;
-        ui.chapter = levelFacts(continueLevel(d)).chapter;
         if (!d.abilities[ui.ability]) ui.ability = d.loadout[0] || Object.keys(d.abilities)[0] || 'shockwave';
         render();
         ctx.show('hub');
@@ -389,52 +341,8 @@ export function createHub(ctx) {
         return true;
     }
 
-    function renderPrep() {
-        const d = Save.data;
-        const { index, resume } = ui.prep;
-        const f = levelFacts(index);
-        const owned = ABILITIES.filter(a => d.abilities[a.id]);
-        const locked = ABILITIES.length - owned.length;
-        const rewards = levelRewards(d, index);
-        if (!ui.prepFocus || !d.abilities[ui.prepFocus]) ui.prepFocus = d.loadout[0] || (owned[0] && owned[0].id) || null;
-        $('prep').dataset.chapter = f.chapter;
-        $('prep-info').innerHTML = `<small class="kicker">Capítulo ${f.chapter} · ${CHAPTER_NAMES[f.chapter]} · Fase ${index + 1}</small>
-            <h2>${f.name}</h2>
-            <div class="prep-diff">${difficulty(f.difficulty)} <span>${DIFFICULTY[f.difficulty - 1]}</span>${f.boss ? ` <span class="tag tag-boss">${icon('boss')} Chefe</span>` : ''}</div>
-            <p>${f.desc}</p>
-            <div class="prep-block"><small class="kicker-soft">Objetivos</small><ul>${levelObjectives(index).map(o => `<li>${icon(o.icon)} ${o.text}</li>`).join('')}</ul></div>
-            ${rewards.length ? `<div class="prep-block"><small class="kicker-soft">Recompensas previstas</small><ul class="rewards">${rewards.map(o => `<li>${icon(o.icon)} ${o.text}</li>`).join('')}</ul></div>` : ''}
-            ${resume ? `<div class="prep-note">${icon('flag')} Você tem um checkpoint nesta fase.</div>` : ''}`;
-        $('prep-slots').innerHTML = `<div class="slots-head"><b>${d.loadout.length}/${LOADOUT_SIZE}</b><span>espaços ocupados</span><em id="prep-msg" role="status"></em></div><div class="slots">${loadoutSlots(true)}</div>`;
-        $('prep-grid').innerHTML = owned.length ? owned.map(a => abilityCard(a, 'ability-equip')).join('') : '<p class="empty-note">Nenhuma habilidade desbloqueada ainda.</p>';
-        $('prep-locked').textContent = locked ? `Mais ${locked} ${locked === 1 ? 'habilidade bloqueada' : 'habilidades bloqueadas'}: veja os requisitos na aba Habilidades.` : 'Você desbloqueou todas as habilidades.';
-        $('prep-detail').innerHTML = ui.prepFocus ? abilityDetail(ui.prepFocus, false) : '';
-        $('btn-prep-clear').disabled = !d.loadout.length;
-        $('btn-prep-start-label').textContent = resume ? 'Retomar do checkpoint' : 'Iniciar Fase';
-        $('btn-prep-restart').classList.toggle('hidden', !resume);
-    }
-
-    function openPrep(index, resume = null) {
-        if (!Save.data) return;
-        ui.prep = { index, resume };
-        ui.prepFocus = null;
-        renderPrep();
-        ctx.show('prep');
-        refocus('#btn-prep-start');
-    }
-
-    function prepMessage(text) {
-        const el = $('prep-msg');
-        if (!el) return;
-        el.textContent = text;
-        el.classList.remove('show');
-        void el.offsetWidth;
-        el.classList.add('show');
-    }
-
     function afterLoadoutChange(focusSelector) {
-        if (ctx.currentScreen() === 'prep') renderPrep();
-        else render(false);
+        render(false);
         refocus(focusSelector);
     }
 
@@ -446,31 +354,16 @@ export function createHub(ctx) {
             }
             refocus('#hub-nav .selected');
         },
+        // Continuar: volta direto ao último checkpoint salvo, sem tela de preparação.
         'hub-continue'() {
-            const d = Save.data;
-            const index = continueLevel(d);
-            openPrep(index, resumeFor(d, index));
+            const point = continueRoom(Save.data);
+            ctx.start(point.room, point.resume);
         },
-        'open-level'(btn) {
-            const index = +btn.dataset.arg;
-            const d = Save.data;
-            if (levelStatus(d, index) === 'locked') {
-                Sfx.denied();
-                ctx.toast('lock', 'Fase bloqueada', `Conclua a fase ${index} para liberar ${LEVELS[index].name}.`);
-                return;
-            }
-            openPrep(index, resumeFor(d, index));
-        },
-        'chapter-pick'(btn) {
-            const chapter = +btn.dataset.arg;
-            if (!chapterProgress(Save.data, chapter).open) {
-                Sfx.denied();
-                ctx.toast('lock', 'Capítulo bloqueado', `Conclua o Capítulo ${chapter - 1} para continuar a subida.`);
-                return;
-            }
-            ui.chapter = chapter;
-            renderPanel(false);
-            refocus(`.chapter-tab.ch-${chapter}`);
+        // Viagem rápida pelo mapa da central: começa no checkpoint escolhido (e ele vira o save).
+        'map-travel'(btn) {
+            const flag = Save.data.world.flags[btn.dataset.arg];
+            if (!flag) return;
+            ctx.travelTo(flag);
         },
         'ability-filter'(btn) {
             ui.filter = btn.dataset.arg;
@@ -497,28 +390,9 @@ export function createHub(ctx) {
             }
             afterLoadoutChange(`.ab-card[data-arg=${id}]`);
         },
-        'ability-equip'(btn) {
-            const id = btn.dataset.arg;
-            ui.prepFocus = id;
-            if (Save.unequip(id)) {
-                Sfx.unequip();
-                afterLoadoutChange(`.ab-card[data-arg=${id}]`);
-                return;
-            }
-            const error = Save.equip(id);
-            if (error) {
-                Sfx.denied();
-                renderPrep();
-                refocus(`.ab-card[data-arg=${id}]`);
-                prepMessage(error);
-                return;
-            }
-            Sfx.equip();
-            afterLoadoutChange(`.ab-card[data-arg=${id}]`);
-        },
         'slot-remove'(btn) {
             if (Save.unequip(btn.dataset.arg)) Sfx.unequip();
-            afterLoadoutChange(ctx.currentScreen() === 'prep' ? '#prep-grid .ab-card' : '#hub-nav .selected');
+            afterLoadoutChange('#hub-nav .selected');
         },
         'ability-upgrade'(btn) {
             const id = btn.dataset.arg;
@@ -527,17 +401,9 @@ export function createHub(ctx) {
             Sfx.upgrade();
             const level = Save.data.abilities[id];
             ctx.toast(a.icon, `${a.name}: nível ${level}`, a.levels[level - 1].text);
-            if (level === a.levels.length) ctx.game.unlock('ability_max');
+            if (maxedAbilityCount(Save.data) >= 3) ctx.game.unlock('ability_max3');
             render(false);
             refocus(`.ab-card[data-arg=${id}]`);
-        },
-        'prep-clear'() {
-            if (Save.clearLoadout()) Sfx.unequip();
-            renderPrep();
-            refocus('#prep-grid .ab-card');
-        },
-        'prep-back'() {
-            open(ui.tab);
         },
         'record-pick'(btn) {
             ui.record = btn.dataset.arg;
@@ -546,28 +412,11 @@ export function createHub(ctx) {
         },
         'scene-replay'(btn) {
             ctx.replayScene(btn.dataset.arg);
-        },
-        'prep-start'() {
-            ctx.start(ui.prep.index, ui.prep.resume);
-        },
-        'prep-restart'() {
-            ctx.start(ui.prep.index, null);
         }
     };
 
-    $('prep-grid').addEventListener('focusin', e => previewAbility(e.target));
-    $('prep-grid').addEventListener('mouseover', e => previewAbility(e.target));
-    function previewAbility(target) {
-        const card = target.closest && target.closest('[data-ability]');
-        if (!card || card.dataset.ability === ui.prepFocus) return;
-        ui.prepFocus = card.dataset.ability;
-        document.querySelectorAll('#prep-grid .ab-card').forEach(el => el.classList.toggle('selected', el === card));
-        $('prep-detail').innerHTML = abilityDetail(ui.prepFocus, false);
-    }
-
     return {
         open,
-        openPrep,
         actions,
         get tab() { return ui.tab; },
         setTab(tab) { ui.tab = tab; render(); },

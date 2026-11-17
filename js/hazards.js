@@ -224,6 +224,26 @@ export class Secret {
     sync() {}
 }
 
+// Aviso visual sem dano: marca no chão o caminho de um ataque que ainda vai acontecer.
+export class Telegraph {
+    constructor(game, x, y, w, h, duration, color = 0xff5a3c) {
+        Object.assign(this, { x, y, w, h, duration, age: 0, done: false });
+        this.mesh = E.makeStrike(w, h, color);
+        this.mesh.position.set(x + w / 2, y + h / 2, 0.5);
+        game.view.root.add(this.mesh);
+        E.setTelegraph(this.mesh, 'warn');
+    }
+
+    update(game, dt) {
+        this.age += dt;
+        if (this.age >= this.duration) this.done = true;
+    }
+
+    dispose(game) {
+        game.view.root.remove(this.mesh);
+    }
+}
+
 export class Strike {
     constructor(game, x, y, w, h, warn = 0.8, active = 0.25, color = 0xff5a3c) {
         Object.assign(this, { x, y, w, h, warn, active, age: 0 });

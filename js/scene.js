@@ -13,8 +13,12 @@ const WEATHER = {
     rain: { color: 0xb6d2ff, vx: -5, vy: -24, size: 0.34, kind: 'streak' },
     dust: { color: 0xfff0d0, vx: 0.5, vy: 0.2, size: 0.09, kind: 'soft' },
     sparkle: { color: 0x9fe6ff, vx: 0, vy: 0.5, size: 0.13, kind: 'soft' },
-    embers: { color: 0xffa050, vx: 0.6, vy: 2.2, size: 0.13, kind: 'soft' }
+    embers: { color: 0xffa050, vx: 0.6, vy: 2.2, size: 0.13, kind: 'soft' },
+    ash: { color: 0xc9b2a6, vx: 0.35, vy: -0.8, size: 0.12, kind: 'soft' },
+    cloud: { color: 0xfff4d8, vx: 0.8, vy: 0.35, size: 0.15, kind: 'soft' }
 };
+// Luz do pós-efeito por capítulo. No Inferno (4) a luz puxa para o vermelho; no Céu (5), para o dourado.
+const CHAPTER_LIGHT = { 1: 0xfdf8ee, 2: 0xe6edff, 3: 0xfff0e2, 4: 0xffd8c4, 5: 0xfff6e2 };
 
 function pointSprite(kind) {
     const c = document.createElement('canvas');
@@ -228,7 +232,7 @@ export class View {
         this.skyMaterial.uniforms.top.value.set(theme.sky[0]);
         this.skyMaterial.uniforms.bottom.value.set(theme.sky[1]);
         this.postMat.uniforms.shade.value.set(theme.sky[0]);
-        this.postMat.uniforms.light.value.set(level.chapter === 3 ? 0xfff0e2 : level.chapter === 2 ? 0xe6edff : 0xfdf8ee);
+        this.postMat.uniforms.light.value.set(CHAPTER_LIGHT[level.chapter] ?? CHAPTER_LIGHT[1]);
         useLevelTextures(level.name);
         this.env = buildBackdrop(this.root, level);
         this.applyQuality();

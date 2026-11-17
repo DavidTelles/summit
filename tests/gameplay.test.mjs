@@ -241,7 +241,7 @@ for (const [index, name] of [[4, 'Caçador do Pico'], [8, 'Olho da Tempestade'],
         });
         const b = game.boss;
         const a = game.level.arena;
-        assert.equal(game.goal.mesh.visible, false);
+        assert.ok(game.goal.locked, 'passagem fechada com o chefe vivo');
         game.hurtPlayer = () => {};
         game.kill = () => {};
         game.player.x = game.goal.x;
@@ -295,15 +295,16 @@ for (const [index, name] of [[4, 'Caçador do Pico'], [8, 'Olho da Tempestade'],
         run(game, 3);
         assert.equal(b.mode, 'dead');
         assert.equal(ended, 1);
-        assert.equal(game.goal.mesh.visible, true);
+        assert.equal(game.goal.locked, null, 'a derrota abre a passagem');
         assert.equal(game.gate.active, false);
         assert.equal(Save.data.achievements[game.level.boss], true);
         game.player.x = game.goal.x;
         game.player.y = game.goal.y + 0.2;
         run(game, 1.2);
         assert.ok(completed && completed.lastOfChapter);
+        assert.deepEqual(completed.target, { room: index + 1, door: 'in' }, 'a passagem leva à próxima região');
         assert.equal(Save.data.completedChapters.includes(game.level.chapter), true);
-        assert.equal(Save.data.checkpoint, null);
+        assert.equal(Save.data.checkpoint.level, index, 'o save da entrada da arena continua valendo');
     });
 
     test(`chefe "${name}": morrer na luta retorna à fase atual sem travar`, () => {
@@ -350,7 +351,7 @@ test('todas as fases rodam 30s com inimigos sem erro e sem NaN', () => {
 
 test('capítulos e progressão: fases mapeadas e habilidades concedidas', () => {
     LEVELS.forEach((l, i) => assert.equal(l.chapter, chapterOfLevel(i)));
-    assert.equal(LEVELS.length, 12);
+    assert.equal(LEVELS.length, 18, '12 fases da montanha + 3 do Inferno + 3 do Céu');
     assert.ok(memoryStore instanceof Map);
     const { game } = newGame(2);
     game.player.x = game.goal.x;

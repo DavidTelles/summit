@@ -15,11 +15,18 @@ export const THEMES = {
     'Pico da Tormenta': { sky: ['#0d1533', '#35487e'], far: '#26365f', mid: '#192647', near: '#0b1330', fog: '#5e78b0', rock: '#141d39', cap: '#3f5a8a', capLine: '#7ea0d6', dress: ['rock', 'rod'], motif: ['stormPeaks', 'observatory', 'crags'], lightning: true, fg: 'rock' },
     'Desfiladeiro Final': { sky: ['#2a0c0b', '#9c3a18'], far: '#6d2a18', mid: '#451a12', near: '#220c09', fog: '#d9662a', rock: '#2a1512', cap: '#6b3323', capLine: '#ff8a3c', dress: ['ember', 'iron', 'rock', 'ember'], motif: ['gorge', 'machines', 'caveNear'], enclosed: false, glow: 0xff7a30, fg: 'stal' },
     'Núcleo da Montanha': { sky: ['#180706', '#531a0d'], far: '#3a140c', mid: '#280d08', near: '#150705', fog: '#c0501f', rock: '#231210', cap: '#5e2e20', capLine: '#ff8a3c', dress: ['ember', 'iron', 'crystal'], motif: ['coreFar', 'machines', 'caveNear'], enclosed: true, glow: 0x6fcfff, fg: 'stal' },
-    'Cume Eterno': { sky: ['#1b0605', '#7a2410'], far: '#561b0e', mid: '#361009', near: '#190705', fog: '#e0602a', rock: '#231010', cap: '#6d3020', capLine: '#ffa050', dress: ['ember', 'iron', 'ember', 'crystal'], motif: ['coreFar', 'machines', 'caveNear'], enclosed: false, glow: 0xff8a3c, fg: 'stal' }
+    'Cume Eterno': { sky: ['#1b0605', '#7a2410'], far: '#561b0e', mid: '#361009', near: '#190705', fog: '#e0602a', rock: '#231010', cap: '#6d3020', capLine: '#ffa050', dress: ['ember', 'iron', 'ember', 'crystal'], motif: ['coreFar', 'machines', 'caveNear'], enclosed: false, glow: 0xff8a3c, fg: 'stal' },
+    'Portão de Cinzas': { sky: ['#140505', '#5c1708'], far: '#3c1510', mid: '#27100c', near: '#140606', fog: '#a83a1a', rock: '#1f0d0c', cap: '#4a1e18', capLine: '#ff5a2a', dress: ['ember', 'iron', 'rock', 'ember'], motif: ['gorge', 'machines', 'caveNear'], enclosed: false, glow: 0xff5a2a, fg: 'stal' },
+    'Ponte das Correntes': { sky: ['#110404', '#6a1a0a'], far: '#40140e', mid: '#2a0d0a', near: '#120505', fog: '#c0441c', rock: '#1d0b0a', cap: '#4f2018', capLine: '#ff6a2a', dress: ['iron', 'ember', 'iron', 'rock'], motif: ['abyss', 'floatRuins', 'caveNear'], enclosed: false, glow: 0xff6a2a, fg: 'stal' },
+    'Salão do Mentor': { sky: ['#0e0304', '#4a1008'], far: '#2e0e0c', mid: '#1f0a08', near: '#0e0404', fog: '#902a14', rock: '#1a0909', cap: '#431a14', capLine: '#ff4a20', dress: ['ember', 'iron', 'ember', 'stal'], motif: ['coreFar', 'machines', 'caveNear'], enclosed: true, glow: 0xff4a20, fg: 'stal' },
+    'Limiar das Nuvens': { sky: ['#5f83cf', '#ffe3b5'], far: '#f4e6d0', mid: '#e7d8d6', near: '#c9c0dd', fog: '#fff4dd', rock: '#9c95b6', cap: '#fff6e4', capLine: '#e8c878', dress: ['rock', 'rock'], motif: ['cloudBank', 'cloudBank', 'cloudBank'], rays: 0xfff0c8, glow: 0xffe9b8, fg: 'float' },
+    'Escadaria de Luz': { sky: ['#4f6fc0', '#ffd9a0'], far: '#efdcc6', mid: '#ddcccf', near: '#bdb2d4', fog: '#ffeed2', rock: '#938cb0', cap: '#fff2da', capLine: '#e8c878', dress: ['rock', 'rock'], motif: ['skyColumns', 'cloudBank', 'cloudBank'], rays: 0xffe8b8, glow: 0xffe2a0, fg: 'float' },
+    'Trono do Alto': { sky: ['#3d57a6', '#ffcf8a'], far: '#e6cfb6', mid: '#d3bfc6', near: '#ada3c9', fog: '#ffe6bf', rock: '#8982a8', cap: '#ffeed0', capLine: '#f0cf80', dress: ['rock', 'rock'], motif: ['skyColumns', 'skyColumns', 'cloudBank'], rays: 0xffe0a0, glow: 0xffd98a, fg: 'float' }
 };
 
 const fallback = THEMES['Base do Acampamento'];
-export const themeOf = level => THEMES[level.name] || fallback;
+// Salas opcionais do mundo aberto usam o cenário de uma fase existente (level.theme).
+export const themeOf = level => THEMES[level.theme || level.name] || fallback;
 
 function ridge(W, seed, rough = 1) {
     const r = rng(seed);
@@ -290,6 +297,34 @@ const MOTIFS = {
             const y = H * (0.2 + r() * 0.6);
             floatRock(ctx, x, y, W * (0.05 + r() * 0.06), c, r);
             arch(ctx, x - 1.5, y, 3, H * 0.09, c, rgba(t.fog, 0.2));
+        }
+    },
+    // Céu: bancos de nuvem em vez de relevo. A base fica opaca para esconder o fundo do cenário.
+    cloudBank(ctx, W, H, c, t, seed) {
+        const r = rng(seed);
+        ctx.fillStyle = c;
+        ctx.fillRect(0, 0, W, H * 0.34);
+        for (let i = 0; i < 46; i++) {
+            const x = (i / 46) * W;
+            const rad = H * (0.08 + r() * 0.1);
+            const y = H * (0.3 + r() * 0.12);
+            for (const dx of [-W, 0, W]) {
+                ctx.beginPath();
+                ctx.arc(x + dx, y, rad, 0, TAU);
+                ctx.fill();
+            }
+        }
+    },
+    skyColumns(ctx, W, H, c, t, seed) {
+        MOTIFS.cloudBank(ctx, W, H, c, t, seed);
+        const r = rng(seed + 3);
+        for (let i = 0; i < 7; i++) {
+            const x = W * (0.06 + i * 0.14 + r() * 0.04);
+            const w = W * 0.016;
+            const h = H * (0.55 + r() * 0.3);
+            ctx.fillStyle = c;
+            ctx.fillRect(x, H * 0.3, w, h - H * 0.3);
+            ctx.fillRect(x - w * 0.6, h, w * 2.2, H * 0.03);
         }
     },
     abyss(ctx, W, H, c, t, seed) {

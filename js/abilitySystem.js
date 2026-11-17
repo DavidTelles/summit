@@ -11,7 +11,7 @@ const SKILL_ACTIONS = ['skill1', 'skill2', 'skill3'];
 
 const COLORS = {
     wave: 0x8fd3ff, lance: 0xfff2b0, blade: 0xff8a6b, parry: 0xffffff, shield: 0x6fe3c4,
-    heal: 0x7dffa8, wind: 0xbdf0ff, focus: 0xffd166, recall: 0xc58bff, time: 0xa99bff, form: 0xffd23f
+    heal: 0x7dffa8, wind: 0xbdf0ff, focus: 0xffd166, recall: 0xc58bff, time: 0xa99bff, lastStand: 0xffd23f
 };
 
 const rectNear = (part, x, y, r) => Math.abs(part.x - x) < part.w / 2 + r && Math.abs(part.y - y) < part.h / 2 + r;
@@ -165,12 +165,6 @@ const ACTIVATE = {
     time_dilation(sys, s, p) {
         sys.addRing(p.x, p.y + PH / 2, 8, COLORS.time);
         Sfx.slowOn();
-    },
-    summit_form(sys, s, p) {
-        p.dashes = sys.game.maxDashes();
-        sys.addRing(p.x, p.y + PH / 2, 4, COLORS.form);
-        sys.game.shake(0.5);
-        Sfx.formOn();
     }
 };
 
@@ -190,7 +184,6 @@ export class AbilitySystem {
         this.senseTimer = 0;
         this.mesh = {
             shield: this.addAura(E.makeAbilityAura(COLORS.shield)),
-            form: this.addAura(E.makeAbilityAura(COLORS.form)),
             blade: this.addAura(E.makeAbilityAura(COLORS.blade)),
             marker: this.byId.has('recall') ? this.addAura(E.makeAbilityMarker(COLORS.recall)) : null
         };
@@ -202,6 +195,14 @@ export class AbilitySystem {
         return mesh;
     }
 
+    // Remove da cena tudo o que este conjunto de habilidades criou (troca de loadout em jogo).
+    dispose() {
+        this.effects.forEach(fx => fx.dispose());
+        this.effects.length = 0;
+        for (const mesh of Object.values(this.mesh)) if (mesh) this.game.view.root.remove(mesh);
+        this.secretTargets = [];
+    }
+
     isActive(id) {
         const s = this.byId.get(id);
         return !!s && s.active > 0;
@@ -210,10 +211,6 @@ export class AbilitySystem {
     get worldScale() {
         const s = this.byId.get('time_dilation');
         return s && s.active > 0 ? s.stats.scale : 1;
-    }
-
-    get formActive() {
-        return this.isActive('summit_form');
     }
 
     update(dt, p) {
@@ -242,7 +239,6 @@ export class AbilitySystem {
         }
         if (p.dead) return;
         this.updatePassives(dt, p);
-        if (this.formActive) p.dashes = Math.max(p.dashes, this.game.maxDashes());
         if (this.game.finished || this.game.cutscene) return;
         this.slots.forEach((s, i) => {
             if (this.game.input.hit(...actionCodes(SKILL_ACTIONS[i]))) this.activate(s, p);
@@ -451,7 +447,6 @@ export class AbilitySystem {
     }
 
     contactKind(p) {
-        if (this.formActive) return 'blade';
         return p.dashTimer > 0 && this.isActive('blade_dash') ? 'blade' : null;
     }
 
@@ -466,17 +461,18 @@ export class AbilitySystem {
 
     absorbHit(sourceX) {
         const p = this.game.player;
-        if (this.formActive) return true;
         const dodge = this.byId.get('perfect_dodge');
         if (dodge && (p.dashTimer > 0 || this.dodgeTimer > 0)) {
             if (dodge.stats.refund) p.dashes = Math.max(p.dashes, 1);
             dodge.pulse = 0.4;
             this.game.view.emit(p.x, p.y + PH / 2, 0xffffff, 8, 4, 0.3);
+            this.countFeat('dodges', 25, 'dodge_25');
             return true;
         }
         const guard = this.byId.get('riposte');
         if (guard && guard.active > 0) {
             this.parry(guard, p, sourceX);
+            this.countFeat('parries', 10, 'parry_10');
             return true;
         }
         const shield = this.byId.get('energy_shield');
@@ -491,6 +487,13 @@ export class AbilitySystem {
             return true;
         }
         return false;
+    }
+
+    countFeat(key, goal, achievement) {
+        const d = Save.data;
+        if (!d) return;
+        d[key] = (d[key] || 0) + 1;
+        if (d[key] >= goal) this.game.unlock(achievement);
     }
 
     parry(s, p, sourceX) {
@@ -541,7 +544,7 @@ export class AbilitySystem {
         this.game.hitstop(0.2);
         this.game.shake(0.7);
         this.game.view.damageFlash();
-        this.game.view.emit(p.x, p.y + PH / 2, COLORS.form, 30, 7, 0.8);
+        this.game.view.emit(p.x, p.y + PH / 2, COLORS.lastStand, 30, 7, 0.8);
         Sfx.lastStand();
     }
 
@@ -613,7 +616,6 @@ export class AbilitySystem {
         };
         place(this.mesh.shield, this.isActive('energy_shield'), 1 + Math.sin(t * 6) * 0.03);
         place(this.mesh.blade, this.isActive('blade_dash'), 0.72 + Math.sin(t * 14) * 0.05);
-        place(this.mesh.form, this.formActive, 1.12 + Math.sin(t * 9) * 0.08);
         if (this.mesh.marker && this.mesh.marker.visible) this.mesh.marker.rotation.z = t * 2;
     }
 

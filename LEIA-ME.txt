@@ -12,15 +12,44 @@ Tambem funciona hospedado (Vercel, GitHub Pages, Netlify) - e so enviar a pasta.
 
 CONTROLES (podem ser trocados em Configuracoes)
 Mover: setas ou A D | Pular: Espaco/C/Z | Dash: X/K/J + direcao
-Agarrar parede: Shift/V/L + cima/baixo | Reiniciar: R | Pausar: Esc/P
+Agarrar parede: Shift/V/L + cima/baixo | Voltar ao ultimo checkpoint: R
+Inventario: Esc/P (ultima aba), Tab/I (habilidades), M (mapa) | controle: Start
+Dentro do inventario: Q/E ou Tab (controle: LB/RB) trocam de aba; Esc, P ou I fecham.
 Pancada no chao (apos a fase 10): baixo + Pular no ar
 Habilidades equipadas: Q, E e F (controle: LB, RB e Y)
 Menus: setas, Enter e Esc. No controle: direcional, A confirma e B volta.
 
+MUNDO ABERTO
+As 18 fases viraram areas ligadas umas as outras, como em Hollow Knight. O fim de
+cada area e uma passagem de pedra: atravessar leva direto a proxima, sem tela de
+resultado. Toda area tem uma passagem de volta logo atras do inicio, entao da para
+voltar a qualquer lugar a pe. Nas arenas, a passagem fica selada ate o chefe cair;
+chefes derrotados nao voltam e a arena fica livre.
+Morangos coletados nao reaparecem, paredes quebradas continuam quebradas e a lava do
+Nucleo fica parada depois que a area foi vencida.
+Areas opcionais (abertas por movimentos ganhos mais tarde):
+  Galeria Soterrada  - embaixo da Cidade Antiga: quebre o piso rachado com a Pancada.
+  Fenda dos Ecos     - topo do pilar do Templo do Vento ate as Ruinas Suspensas (pede Dash Aereo).
+  Veio de Magma      - atalho do Portao de Cinzas ao topo do Nucleo; so abre pelo lado do Inferno.
+  Mirante Partido    - queda do Limiar das Nuvens de volta ao Cume Eterno.
+
+CHECKPOINTS = SAVE
+Cada bandeira tocada salva o jogo (aparece "Jogo salvo"). Ao morrer, voce renasce na
+ultima bandeira, mesmo que ela esteja em outra area. Ao sair para a central ou o menu,
+"Continuar" volta exatamente para ela. A entrada de cada arena de chefe tambem salva.
+Toda bandeira ja tocada vira ponto de viagem rapida no mapa.
+
+INVENTARIO EM JOGO
+Pausa o jogo por cima da fase, com as abas Habilidades, Mapa, Som, Jogabilidade e
+Controles. A troca de habilidades vale na hora (inclusive em luta de chefe); recargas
+em andamento sao mantidas. No mapa, a viagem rapida so funciona descansando numa bandeira.
+Jogabilidade: dicas de controle de Oren, tremor de tela, acabamento da imagem, tela cheia.
+
 CENTRAL DA CAMPANHA
-Cada save abre a sua central: Inicio, Capitulos, Habilidades, Conquistas,
-Estatisticas e Configuracoes. "Sair do Save" volta aos tres slots sem apagar nada.
-Antes de cada fase, a tela de preparacao permite levar ate 3 habilidades.
+Cada save abre a sua central: Inicio, Mapa, Habilidades, Registros, Conquistas,
+Estatisticas e Configuracoes. "Continuar" leva direto ao ultimo checkpoint.
+No Mapa, clique numa bandeira para comecar a partir dela (ela vira o save).
+"Sair do Save" volta aos tres slots sem apagar nada. Ate 3 habilidades equipadas.
 Os 5 movimentos base (Dash, Escalada, Pulo Duplo, Dash Aereo e Pancada) ficam
 sempre ativos e nao ocupam espaco: as fases foram desenhadas para exigi-los.
 
@@ -32,14 +61,42 @@ HISTORIA
 Voce e Kael. A cada campanha, cenas, falas e registros ficam salvos so naquele save.
 Pedras com inscricoes guardam registros opcionais; releia em Registros, na central.
 Esc pula uma cena; Enter avanca.
+Nas primeiras fases, licoes de Oren (o velho guarda) mostram os comandos com as teclas
+configuradas. Cada licao aparece uma vez por save.
+
+REINOS
+Capitulos 1 a 3: a Montanha (tutorial). Capitulo 4: o Inferno. Capitulo 5: o Ceu.
+Ao concluir o ultimo capitulo de um reino, uma cena mostra a passagem para o proximo
+e a central daquele save muda de cenario, luz e musica. O reino fica gravado no save
+e nao volta atras ate o jogo ser zerado.
+Capitulo 4 - Os Portoes: Portao de Cinzas, Ponte das Correntes (Besta de Carga)
+e Salao do Mentor (Mentor Corrompido).
+Capitulo 5 - O Alto: Limiar das Nuvens, Escadaria de Luz e Trono do Alto (Arauto do Alto).
+
+MENU E REGIOES
+O menu principal muda de nome, logo, cores, cenario e musica conforme a regiao:
+SUMMIT na Montanha, O FUNDO no Inferno e O ALEM no Ceu.
+O jogo conta como zerado ao ver os creditos finais (assistidos ou pulados).
+So entao aparece o botao Regioes, que permite escolher o lugar do menu; campanhas
+zeradas passam a abrir a central nessa regiao.
+
+CONQUISTAS
+Agrupadas em Jornada, Chefes, Dominio e Exploracao. Conquistas faceis antigas foram
+removidas; as equivalentes de saves antigos sao convertidas ao carregar.
+A habilidade "Forma do Cume" foi removida; saves que a tinham carregam normalmente
+e o espaco do loadout fica livre.
 
 TESTES (Node 22, sem instalar nada)
   node --test tests/gameplay.test.mjs     regras, saves, chefes, fases
   node --test tests/abilities.test.mjs    habilidades, selecao, evolucao, isolamento
   node --test tests/story.test.mjs        historia, registros, cenas, migracao de saves
   node --test tests/bosses.test.mjs       chefes dos cap. 2 e 3, cap. 1 intacto, bots que vencem cada chefe
+  node --test tests/inferno.test.mjs      Inferno: reino da central, conquistas, Besta e Mentor
+  node --test tests/regions.test.mjs      Ceu, passagens, zerar, escolha de regiao, Arauto
+  node --test tests/world.test.mjs        mundo aberto: passagens, saves em checkpoint, troca de habilidades
   node tests/bossBot.mjs                  relatorio dos bots: tempo, mortes e golpes por loadout
   node tests/solver.mjs                   prova que cada fase pode ser concluida
   node tests/solver.mjs 6,7 --berries     idem, incluindo os morangos
+  node tests/solver.mjs --branches        prova os caminhos das areas opcionais e das entradas delas
   node tests/artShots.mjs [pasta]         capturas de cada fase, pose e chefe, com FPS
   node tests/browser.mjs                  navegador real, com capturas de tela

@@ -95,7 +95,7 @@ test('pedra de registro: coleta, salva, avisa e não reaparece; evento dispara u
     assert.deepEqual(records, [stone.id]);
     assert.equal(stone.mesh.visible, false);
     assert.equal(Save.data.story.records[stone.id], true);
-    assert.equal(Save.data.achievements.first_record, true);
+    assert.equal(Save.data.achievements.first_record, undefined, 'conquista trivial removida');
     game.player.x = 64;
     game.player.y = 14;
     run(game, 0.05);
@@ -136,7 +136,7 @@ test('saves isolados: registros, eventos e cenas de um save não aparecem em out
 test('migração v3 → v4: mantém progresso, não força cenas passadas e entrega registros obrigatórios já vividos', () => {
     const old = { version: 3, mode: 'permadeath', unlocked: 7, currentLevel: 6, deaths: 3, totalTime: 900, best: { 0: { time: 9, berries: 1 }, 3: { time: 9, berries: 0 }, 4: { time: 50, berries: 2 } }, achievements: { boss1: true }, completedChapters: [1], secrets: { '5:valley': true }, loadout: ['shockwave'], abilities: { shockwave: 2 } };
     const d = sanitizeSave(old);
-    assert.equal(d.version, 4);
+    assert.equal(d.version, 7);
     assert.equal(d.mode, 'permadeath');
     assert.equal(d.unlocked, 7);
     assert.equal(d.best[4].time, 50);
@@ -163,6 +163,10 @@ test('fila de cenas: novo save pede a abertura; capítulos e final só depois de
         d.best[level] = { time: 1, berries: 0 };
         assert.equal(pendingScene(d), scene);
         Save.sawScene(scene);
+        if (scene === 'final') {
+            assert.equal(pendingScene(d), 'ch3to4', 'depois do final da montanha, a descida para o Inferno');
+            Save.sawScene('ch3to4');
+        }
     }
     assert.equal(pendingScene(d), null);
 });

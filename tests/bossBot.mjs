@@ -91,6 +91,24 @@ class Driver {
     }
 }
 
+function heraldBrain(d, b) {
+    const { game, p } = d;
+    const a = game.level.arena;
+    const wave = game.shots.find(s => s.ground && Math.abs(s.x - p.x) < 2.6 && s.vx * (p.x - s.x) > 0);
+    if (wave && p.onGround) d.jump(0.3);
+    if (b.vulnerable) {
+        const dx = b.x - p.x;
+        d.go(b.x);
+        if (Math.abs(dx) < dashRange) d.dash(dx, b.y + 1 - p.y);
+        return;
+    }
+    if (d.dodgeStrikes()) return;
+    d.useSkills();
+    // Fica por perto, mas fora da marca, para chegar ao Arauto antes que a janela feche.
+    const near = b.act === 'mark' ? b.to + (p.x < b.to ? -4 : 4) : b.x + (p.x < b.x ? -4 : 4);
+    d.go(Math.max(a.x1 + 1, Math.min(a.x2 - 1, near)));
+}
+
 function stormBrain(d, b) {
     const { game, p, input } = d;
     const a = game.level.arena;
@@ -348,7 +366,7 @@ export function playBoss(index, opts = {}) {
     };
     let pause = 0;
     let lastDead = false;
-    const brain = index === 8 ? stormBrain : colossusBrain;
+    const brain = index === 8 ? stormBrain : game.level.boss === 'herald' ? heraldBrain : colossusBrain;
     const limit = opts.limit || 900;
     const hurt = game.hurtPlayer.bind(game);
     const stats = { hits: 0, deaths: 0, time: 0, phaseDeaths: {}, windows: 0, hurtBy: hurtLog };
@@ -390,7 +408,7 @@ export function playBoss(index, opts = {}) {
     stats.hp = b.hp;
     stats.phase = b.phase;
     stats.act = b.act;
-    stats.adaptive = b.adaptive.slice();
+    stats.adaptive = (b.adaptive || []).slice();
     return { game, stats };
 }
 
@@ -400,7 +418,7 @@ if (process.argv[1] && process.argv[1].endsWith('bossBot.mjs')) {
         ofensiva: { shockwave: 3, light_lance: 3, riposte: 3 },
         defensiva: { energy_shield: 3, regeneration: 3, heal: 3 },
         mobilidade: { long_dash: 3, air_burst: 3, glide: 3 },
-        especial: { time_dilation: 3, summit_form: 3, perfect_dodge: 3 }
+        especial: { time_dilation: 3, recall: 3, perfect_dodge: 3 }
     };
     for (const index of [8, 11]) {
         for (const [label, abilities] of Object.entries(LOADOUTS)) {

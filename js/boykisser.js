@@ -1,5 +1,5 @@
 import * as THREE from '../lib/three.module.js';
-import { DEFAULT_SKIN, skinById } from './skins.js';
+import { DEFAULT_SKIN, lookById } from './skins.js';
 
 const HEIGHT = 1.35;
 const LATERAL = new THREE.Vector3(-1, 0, 0);
@@ -12,6 +12,10 @@ const BONES = {
     tail0: 'DEF-tail_41', tail1: 'DEF-tail_1_40', tail2: 'DEF-tail_2_39', tail3: 'DEF-tail_3_38', tail4: 'DEF-tail_4_37'
 };
 const FEET = { footF: 'DEF-footR_49', footB: 'DEF-footL_43' };
+// O export do Sketchfab deixou os ossos de palma/dedos (DEF-f_1_palm_*) pendurados na cadeia
+// ORG-upper_arm > ORG-forearm > ORG-hand, que nada anima. Ao girar a cadeia DEF do braço, a mão
+// ficava parada e o braço esticava. Reparentamos ORG-hand sob DEF-hand mantendo a pose de repouso.
+const HAND_FIX = [['DEF-handR_256', 'ORG-handR_352'], ['DEF-handL_154', 'ORG-handL_250']];
 const ARM_CHILD = { armF: 'foreF', armB: 'foreB' };
 const CHEST = 'DEF-spine004_373';
 const FUR = new Set(['white', 'pink']);
@@ -32,6 +36,12 @@ function restFromClip(scene, clip) {
 function prepare(gltf) {
     const scene = gltf.scene;
     if (gltf.animations[0]) restFromClip(scene, gltf.animations[0]);
+    for (const [def, org] of HAND_FIX) {
+        const hand = scene.getObjectByName(def);
+        const fingers = scene.getObjectByName(org);
+        if (hand && fingers) hand.attach(fingers);
+    }
+    scene.updateMatrixWorld(true);
     const box = new THREE.Box3();
     let meshNode = null;
     const colors = {};
@@ -209,7 +219,7 @@ export function makeBoykisser(layer, skinId = DEFAULT_SKIN) {
 }
 
 export function applySkin(model, skinId) {
-    const skin = skinById(skinId) || skinById(DEFAULT_SKIN);
+    const skin = lookById(skinId) || lookById(DEFAULT_SKIN);
     const set = (name, hex) => {
         const m = model.byName[name];
         if (m) m.color.copy(hex === undefined ? source.colors[name] : new THREE.Color(hex));

@@ -2,7 +2,7 @@ import * as THREE from '../lib/three.module.js';
 import * as E from './entities.js';
 import { INK, LAYER, sprite } from './ink.js';
 
-const ROCK = { 1: '#566278', 2: '#3f4a6b', 3: '#553732' };
+const ROCK = { 1: '#566278', 2: '#3f4a6b', 3: '#553732', 4: '#3b1d1d' };
 
 const rockDraw = color => ctx => {
     ctx.fillStyle = color;
@@ -39,7 +39,7 @@ export class HeroStage {
         this.camera.position.set(0, 0.5, 5.2);
         this.camera.lookAt(0, 0.5, 0);
         this.rocks = {};
-        for (const ch of [1, 2, 3]) {
+        for (const ch of Object.keys(ROCK).map(Number)) {
             const rock = sprite(`heroRock${ch}`, 2.4, 0.8, rockDraw(ROCK[ch]), { ay: 0.95, ppu: 170, layer: LAYER.back });
             rock.visible = ch === 1;
             this.scene.add(rock);
@@ -99,7 +99,8 @@ export class HeroStage {
     }
 
     setChapter(chapter) {
-        for (const ch of [1, 2, 3]) this.rocks[ch].visible = ch === (this.rocks[chapter] ? chapter : 1);
+        const shown = this.rocks[chapter] ? chapter : Math.max(...Object.keys(this.rocks).filter(k => +k <= chapter).map(Number), 1);
+        for (const ch of Object.keys(this.rocks).map(Number)) this.rocks[ch].visible = ch === shown;
     }
 
     resize() {
