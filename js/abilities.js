@@ -84,7 +84,7 @@ export const ABILITIES = [
     {
         id: 'last_stand', name: 'Última Chance', icon: 'lastchance', category: 'defense', type: 'passive',
         desc: 'Um golpe fatal deixa você com 1 coração e invulnerável por 2 s. Uma vez por fase.',
-        unlock: { ach: 'no_death' },
+        unlock: { chapter: 1 },
         levels: [
             { text: 'Funciona contra inimigos e perigos de área.', spikes: false, recharge: false },
             { text: 'Recarrega ao ativar um checkpoint.', spikes: false, recharge: true, req: { boss: 'boss2' } },
@@ -122,7 +122,7 @@ export const ABILITIES = [
         ]
     },
     {
-        id: 'crystal_link', name: 'Elo de Cristal', icon: 'link', category: 'mobility', type: 'active',
+        id: 'crystal_link', name: 'Elo de Cristal', icon: 'link', category: 'special', type: 'active',
         desc: 'Puxa você até o cristal de dash disponível mais próximo, em linha reta.',
         unlock: { crystals: 6 },
         levels: [
@@ -144,7 +144,7 @@ export const ABILITIES = [
     {
         id: 'second_wind', name: 'Segundo Fôlego', icon: 'wind', category: 'support', type: 'active',
         desc: 'Enche o fôlego e impede que ele seja gasto por alguns segundos. Ideal para escaladas longas.',
-        unlock: { ach: 'crystal_10' },
+        unlock: { crystals: 10 },
         levels: [
             { text: 'Fôlego livre por 5 s.', duration: 5, cooldown: 20 },
             { text: 'Fôlego livre por 6 s, com recarga menor.', duration: 6, cooldown: 18, req: { level: 8 } },
@@ -200,16 +200,6 @@ export const ABILITIES = [
             { text: 'Mundo a 45% por 3,5 s.', scale: 0.45, duration: 3.5, cooldown: 28, req: { level: 10 } },
             { text: 'Mundo a 35% por 4 s.', scale: 0.35, duration: 4, cooldown: 25, req: { boss: 'boss3' } }
         ]
-    },
-    {
-        id: 'summit_form', name: 'Forma do Cume', icon: 'summit', category: 'special', type: 'active',
-        desc: 'Muda seu estilo de combate: dashes ilimitados, imunidade a golpes e toque que derrota inimigos.',
-        unlock: { level: 11 },
-        levels: [
-            { text: 'Dura 5 s.', duration: 5, cooldown: 45 },
-            { text: 'Dura 6 s, com recarga menor.', duration: 6, cooldown: 40, req: { boss: 'boss3' } },
-            { text: 'Dura 7 s, com recarga menor.', duration: 7, cooldown: 35, req: { ach: 'trial_ch3' } }
-        ]
     }
 ];
 
@@ -235,7 +225,7 @@ export function meetsReq(req, d) {
 }
 
 const BOSS_NAMES = { boss1: 'Caçador do Pico', boss2: 'Olho da Tempestade', boss3: 'Guardião do Cume' };
-const ACH_TEXT = { no_death: 'Conclua uma fase sem morrer', crystal_10: 'Use 10 cristais de dash', trial_ch3: 'Vença uma Provação do Capítulo 3' };
+const ACH_TEXT = { trial_ch3: 'Vença uma Provação do Capítulo 3' };
 
 export function reqText(req) {
     if (!req || req.start) return 'Disponível desde o início';

@@ -1,6 +1,9 @@
 import { LEVELS } from './levels.js';
-import { Input, ACHIEVEMENTS, Save, SKILLS, chapterOfLevel } from './core.js';
-import { ABILITIES } from './abilities.js';
+import { Input, ACHIEVEMENTS, Save, SKILLS, chapterOfLevel, roomKey } from './core.js';
+import { TOTAL_SECRETS } from './campaign.js';
+import { REALMS, realmOfChapter } from './realms.js';
+import { ABILITIES, isLevelDone } from './abilities.js';
+import { ROOMS, arrivalAt, doorsOf, isMain } from './worldMap.js';
 import { AbilitySystem } from './abilitySystem.js';
 import { Sfx } from './audio.js';
 import * as E from './entities.js';
@@ -14,7 +17,9 @@ import { LEVEL_STORY, RECORDS, TOTAL_RECORDS, recordById, recordsFound } from '.
 import { makeDecor, makeRecordStone } from './decor.js';
 import { createAftermath } from './aftermath.js';
 
-const COMPLETE_DELAY = 0.9;
+// Tempo entre tocar uma passagem e a troca de sala (o véu escurece nesse intervalo).
+const COMPLETE_DELAY = 0.3;
+const PASSAGE_OPEN_TIME = 0.9;
 const CRUMBLE_DELAY = 0.35;
 const CRUMBLE_RESPAWN = 2.2;
 const CRYSTAL_COOLDOWN = 2.5;
@@ -30,16 +35,22 @@ export class Game {
         this.accumulator = 0;
     }
 
+    // resume: { x, y, time?, hp?, face?, door? }. Com `door`, o jogador chegou por uma passagem.
     load(index, resume = null) {
+        if (this.boss && this.boss.dispose) this.boss.dispose();
+        this.boss = null;
         this.levelIndex = index;
-        const level = LEVELS[index];
+        const level = ROOMS[index];
         this.level = level;
         this.grid = level.grid;
         E.setChapterArt(level.chapter);
         this.view.build(level);
         this.view.deathVeil(false);
         this.world = new World(this.grid);
-        this.time = resume ? resume.time : 0;
+        this.firstVisit = this.markVisited(index);
+        this.lastStandSpent = false;
+        this.lockNotice = 0;
+        this.time = resume && resume.time ? resume.time : 0;
         this.clock = 0;
         this.freeze = 0;
         this.timeScale = 1;
@@ -56,6 +67,8 @@ export class Game {
         this.permadeathPending = false;
         this.permadeathNotified = false;
         this.bossDamageTaken = false;
+        this.levelHurt = false;
+        this.airKills = 0;
         this.aftermath = null;
         this.storyTimers = [];
         this.newAbilities = [];
@@ -63,6 +76,60 @@ export class Game {
         this.abilities = new AbilitySystem(this, Save.equippedAbilities());
         this.running = true;
         this.pushHud();
+    }
+
+    // Troca as habilidades equipadas no meio da fase (inventário em jogo). Recargas e efeitos ativos
+    // das habilidades que continuam equipadas são mantidos; Última Chance gasta continua gasta.
+    setLoadout(equipped = Save.equippedAbilities()) {
+        const old = this.abilities;
+        if (!old) return;
+        const stand = old.byId.get('last_stand');
+        if (stand && stand.spent) this.lastStandSpent = true;
+        const next = new AbilitySystem(this, equipped);
+        for (const s of next.slots) {
+            const prev = old.byId.get(s.id);
+            if (prev) {
+                for (const key of ['cooldown', 'active', 'charges', 'timer', 'spent', 'marker', 'alert']) s[key] = prev[key];
+            } else if (s.id === 'last_stand') {
+                s.spent = this.lastStandSpent;
+            }
+        }
+        next.dodgeTimer = old.dodgeTimer;
+        next.spikeGrace = old.spikeGrace;
+        next.staminaLock = old.staminaLock;
+        const recall = next.byId.get('recall');
+        if (recall && recall.marker && recall.active > 0) next.showMarker(recall.marker);
+        old.dispose();
+        this.abilities = next;
+        if (this.boss && this.boss.alive && this.boss.mode !== 'idle' && next.slots.length) this.boss.pure = false;
+        this.pushHud();
+    }
+
+    // Marca a sala como visitada no save. Retorna true na primeira visita.
+    markVisited(index) {
+        const d = Save.data;
+        if (!d || d.world.visited[index]) return false;
+        d.world.visited[index] = true;
+        Save.save();
+        return true;
+    }
+
+    // Sala já vencida: a lava que sobe fica parada para permitir voltar por ela.
+    roomSettled(index = this.levelIndex) {
+        const d = Save.data;
+        return !!d && isMain(index) && isLevelDone(d, index);
+    }
+
+    savedKey(kind, x, y) {
+        const d = Save.data;
+        return !!d && !!d.world[kind][roomKey(this.levelIndex, x, y)];
+    }
+
+    keepKey(kind, x, y) {
+        const d = Save.data;
+        if (!d) return;
+        d.world[kind][roomKey(this.levelIndex, x, y)] = true;
+        Save.save();
     }
 
     buildEntities(resume) {
@@ -87,11 +154,16 @@ export class Game {
                 const c = grid.cells[y][x];
                 if (c === 'P') start = { x: x + 0.5, y };
                 else if (c === 'S') {
+                    this.totalBerries++;
+                    // Morangos coletados ficam coletados: no mundo aberto eles não voltam.
+                    if (this.savedKey('collected', x, y)) {
+                        this.levelBerries++;
+                        continue;
+                    }
                     const mesh = E.makeBerry();
                     mesh.position.set(x + 0.5, y + 0.5, 0);
                     root.add(mesh);
-                    this.berries.push({ x: x + 0.5, y: y + 0.5, got: false, mesh });
-                    this.totalBerries++;
+                    this.berries.push({ x: x + 0.5, y: y + 0.5, tx: x, ty: y, got: false, mesh });
                 } else if (c === 'C') {
                     const mesh = E.makeCrystal();
                     mesh.position.set(x + 0.5, y + 0.5, 0);
@@ -114,11 +186,6 @@ export class Game {
                     mesh.position.set(x + 0.5, y, -0.3);
                     root.add(mesh);
                     this.flags.push({ x: x + 0.5, y, active: false, mesh });
-                } else if (c === 'G') {
-                    const mesh = E.makeGoal();
-                    mesh.position.set(x + 0.5, y, 0);
-                    root.add(mesh);
-                    this.goal = { x: x + 0.5, y, mesh };
                 } else if (c === '~') {
                     const mesh = E.makeCrumble();
                     mesh.position.set(x + 0.5, y + 0.75, 0);
@@ -134,22 +201,34 @@ export class Game {
                 }
             }
         }
-        for (const def of this.level.objects || []) {
+        const settled = this.roomSettled();
+        const d = Save.data;
+        for (const raw of this.level.objects || []) {
+            const def = raw.type === 'lava' && raw.rise && settled ? { ...raw, rise: 0 } : raw;
             if (isHazardDef(def)) {
                 const h = createHazard(def, root, this.world);
+                if (def.type === 'secret' && d && d.secrets[`${this.levelIndex}:${def.id || 0}`]) h.found = true;
                 this.hazards.push(h);
                 if (def.type === 'mover') this.world.solids.push(h);
             } else if (isEnemyDef(def)) {
                 this.enemies.push(createEnemy(def.type, def, root));
             }
         }
+        this.restoreBroken();
+        this.buildDoors();
         this.setupArena();
         this.buildStory();
         const origin = resume ? { x: resume.x, y: resume.y } : start;
         this.player = createPlayer(origin.x, origin.y);
         this.player.dashes = this.maxDashes();
+        if (resume && resume.hp > 0) this.player.hp = Math.min(PLAYER_HP, resume.hp);
+        if (resume && resume.face) this.player.facing = resume.face;
         this.spawn = { ...origin };
-        if (resume) this.flags.forEach(f => { f.active = f.x === resume.x && f.y === resume.y; });
+        // O renascimento segue o checkpoint salvo quando ele fica nesta sala.
+        const cp = d && d.checkpoint;
+        if (cp && cp.level === this.levelIndex) this.spawn = { x: cp.x, y: cp.y };
+        const active = cp && cp.level === this.levelIndex ? cp : resume;
+        if (active) this.flags.forEach(f => { f.active = f.x === active.x && f.y === active.y; });
         if (this.playerMesh) E.disposePlayer(this.playerMesh);
         this.playerMesh = E.makePlayer(Save.data ? Save.data.skins.equipped : undefined);
         root.add(this.playerMesh);
@@ -158,9 +237,87 @@ export class Game {
         this.view.follow(origin.x, origin.y, 0, true);
     }
 
+    // Paredes rachadas e pisos quebrados continuam quebrados (atalhos e entradas do mundo aberto).
+    restoreBroken() {
+        const d = Save.data;
+        if (!d) return;
+        const prefix = `${this.levelIndex}:`;
+        for (const k of Object.keys(d.world.broken)) {
+            if (!k.startsWith(prefix)) continue;
+            const [tx, ty] = k.slice(prefix.length).split(',').map(Number);
+            const key = this.world.key(tx, ty);
+            this.world.broken.add(key);
+            const block = this.specialBlocks.get(key);
+            if (block) block.mesh.visible = false;
+        }
+    }
+
+    buildDoors() {
+        this.doors = [];
+        this.goal = null;
+        for (const def of doorsOf(this.levelIndex)) {
+            if (def.arrival) continue;
+            // Depois de zerar, o fim do Trono do Alto não leva a lugar nenhum.
+            if (def.exit && !def.to && Save.data && Save.data.cleared) continue;
+            const door = { def, x: def.x, y: def.y, kind: def.kind, lift: 1, opening: 0, mesh: null };
+            door.locked = this.doorLock(def);
+            if (door.kind === 'arch') {
+                door.mesh = E.makePassage();
+                door.mesh.position.set(def.x, def.y, -0.4);
+                this.view.root.add(door.mesh);
+            }
+            door.lift = door.locked ? 0 : 1;
+            if (door.mesh) E.setPassageLift(door.mesh, door.lift);
+            this.doors.push(door);
+            if (def.exit) this.goal = door;
+        }
+    }
+
+    // Motivo de a passagem estar fechada, ou null quando ela está aberta.
+    doorLock(def) {
+        const lock = def.lock;
+        if (!lock) return null;
+        const d = Save.data;
+        if (lock.skill && !this.hasSkill(lock.skill)) return lock.text;
+        if (lock.opened && !(d && d.world.opened[lock.opened])) return lock.text;
+        return null;
+    }
+
+    setDoorOpen(door, open, animate = false) {
+        door.locked = open ? null : door.locked || 'Fechada.';
+        if (!door.mesh) {
+            door.lift = open ? 1 : 0;
+            return;
+        }
+        if (open && animate) {
+            door.opening = PASSAGE_OPEN_TIME;
+            return;
+        }
+        door.opening = 0;
+        door.lift = open ? 1 : 0;
+        E.setPassageLift(door.mesh, door.lift);
+    }
+
+    get bossBeaten() {
+        const d = Save.data;
+        return !!(d && this.level.boss && d.achievements[this.level.boss]);
+    }
+
     setupArena() {
         const a = this.level.arena;
+        this.gate = null;
         if (!a || !this.level.boss) return;
+        // Chefe já derrotado neste save: a arena fica vazia e a passagem, aberta. Pisos que o
+        // próprio chefe criava (lajes do Guardião) ficam montados, como logo depois da vitória.
+        if (this.bossBeaten) {
+            for (const def of a.slabs || []) {
+                const mesh = E.makeBossSlab(def.w, def.h);
+                mesh.position.set(def.x + def.w / 2, def.y + def.h / 2, 0);
+                this.view.root.add(mesh);
+                this.world.solids.push({ x: def.x, y: def.y, w: def.w, h: def.h, active: true });
+            }
+            return;
+        }
         this.gate = { x: a.gateX, y: a.floor, w: 1, h: a.ceil - a.floor, active: false };
         this.gate.mesh = E.makeGate(this.gate.h);
         this.gate.mesh.position.set(this.gate.x + 0.5, this.gate.y, 0);
@@ -168,7 +325,10 @@ export class Game {
         this.view.root.add(this.gate.mesh);
         this.world.solids.push(this.gate);
         this.boss = createBoss(this, this.level.boss);
-        if (this.goal) this.goal.mesh.visible = false;
+        if (this.goal) {
+            this.goal.locked = 'O caminho só abre quando o guardião cair.';
+            this.setDoorOpen(this.goal, false);
+        }
     }
 
     buildStory() {
@@ -218,6 +378,11 @@ export class Game {
 
     fireMoment(m) {
         Save.sawMoment(this.momentKey(m));
+        // Lições do tutorial usam um canal próprio para não cortar as falas da história.
+        if (m.hint) {
+            if (this.hooks.onHint) this.hooks.onHint(m.line, m.who || 'Lição de Oren');
+            return;
+        }
         this.storyLine(m.line, m.who || 'Kael');
         if (m.then) this.storyTimers.push({ t: 4.2, text: m.then, who: 'Kael' });
         if (m.shake) {
@@ -238,7 +403,6 @@ export class Game {
         stone.mesh.visible = false;
         this.view.emit(stone.x, stone.y, 0x6fcfff, 26, 5, 0.8);
         this.grantRecord(stone.id);
-        this.unlock('first_record');
     }
 
     grantRecord(id) {
@@ -344,6 +508,7 @@ export class Game {
         if (p.iframes > 0 && !ignoreFrames) return;
         if (this.abilities.absorbHit(sourceX)) return;
         if (this.boss && this.boss.fighting) this.bossDamageTaken = true;
+        this.levelHurt = true;
         p.hp -= amount;
         this.abilities.onDamaged();
         if (p.hp <= 0) {
@@ -391,12 +556,9 @@ export class Game {
         this.view.emit(p.x, p.y + 0.6, 0xff5a5a, 10, 4, 0.5);
         this.view.deathVeil(true);
         this.deathMotes = 0;
+        this.levelHurt = true;
+        this.airKills = 0;
         if (d) {
-            if (d.deaths === 1) this.unlock('first_death');
-            if (d.deaths >= 10) this.unlock('die_10');
-            if (d.deaths >= 50) this.unlock('die_50');
-            if (reason === 'spike') this.unlock('die_spike');
-            if (reason === 'fall') this.unlock('die_fall');
             if (d.mode === 'permadeath') {
                 this.permadeathPending = true;
                 this.flushPlaytime();
@@ -406,6 +568,16 @@ export class Game {
     }
 
     respawn() {
+        const d = Save.data;
+        const cp = d && d.checkpoint;
+        // O último checkpoint ficou em outra sala: renasce lá, com a sala recarregada.
+        if (cp && cp.level !== this.levelIndex) {
+            this.running = false;
+            const resume = { x: cp.x, y: cp.y, time: cp.time };
+            if (this.hooks.onRespawnElsewhere) this.hooks.onRespawnElsewhere(cp.level, resume);
+            else this.load(cp.level, resume);
+            return;
+        }
         const p = this.player;
         p.x = this.spawn.x;
         p.y = this.spawn.y;
@@ -471,6 +643,11 @@ export class Game {
             if (this.completeTimer < 0) this.fireComplete();
         }
         const p = this.player;
+        for (const door of this.doors) {
+            if (door.opening <= 0) continue;
+            door.opening = Math.max(0, door.opening - dt);
+            door.lift = 1 - door.opening / PASSAGE_OPEN_TIME;
+        }
         this.abilities.update(dt, p);
         if (p.dead) {
             p.deadTimer -= dt;
@@ -496,6 +673,7 @@ export class Game {
         for (const h of this.hazards) h.update(this, worldDt, p);
         for (const h of this.bossHazards) h.update(this, worldDt, p);
         updatePlayer(this, p, dt);
+        if (p.onGround) this.airKills = 0;
         if (!p.dead) this.updateWorld(p, dt, worldDt);
         this.updateProjectiles(worldDt, p);
         this.updateBoss(p, worldDt);
@@ -544,7 +722,7 @@ export class Game {
                 if (d) {
                     d.crystals++;
                     Save.save();
-                    if (d.crystals >= 10) this.unlock('crystal_10');
+                    if (d.crystals >= 100) this.unlock('crystal_100');
                     this.syncProgress();
                 }
             }
@@ -560,7 +738,6 @@ export class Game {
                 s.anim = 0.3;
                 Sfx.spring();
                 this.view.emit(s.x, s.y + 0.4, 0xffd23f, 12, 4, 0.4);
-                this.unlock('spring');
             }
         }
         for (const f of this.flags) {
@@ -569,26 +746,86 @@ export class Game {
         for (const cr of this.crumbles) this.updateCrumble(cr, p, dt);
         this.updateEnemies(p, worldDt);
         if (p.dead) return;
-        if (this.goal && !this.finished && overlap(cx, cy, PW, PH, this.goal.x, this.goal.y + 1, 1.4, 2)) {
-            if (this.boss && this.boss.alive) return;
-            this.complete();
+        this.updateDoors(p, cx, cy, dt);
+    }
+
+    doorTouched(door, cx, cy) {
+        if (door.kind === 'drop') {
+            const def = door.def;
+            return overlap(cx, cy, PW, PH, def.x + def.w / 2, def.y + def.h / 2, def.w, def.h);
         }
+        return overlap(cx, cy, PW, PH, door.x, door.y + 1, 1.4, 2);
+    }
+
+    updateDoors(p, cx, cy, dt) {
+        this.lockNotice = Math.max(0, this.lockNotice - dt);
+        if (this.finished) return;
+        for (const door of this.doors) {
+            if (!this.doorTouched(door, cx, cy)) continue;
+            if (door.locked || door.opening > 0) {
+                if (this.lockNotice <= 0 && door.locked) {
+                    this.lockNotice = 4;
+                    if (this.hooks.onDoorLocked) this.hooks.onDoorLocked(door.locked);
+                }
+                continue;
+            }
+            if (this.boss && this.boss.alive && door.def.exit) continue;
+            this.enterDoor(door);
+            return;
+        }
+    }
+
+    // Atravessar uma passagem. A saída de uma fase principal também registra a conclusão dela.
+    enterDoor(door) {
+        const def = door.def;
+        const d = Save.data;
+        if (def.opens && d && !d.world.opened[def.opens]) {
+            d.world.opened[def.opens] = true;
+            Save.save();
+        }
+        if (def.exit && isMain(this.levelIndex)) {
+            this.complete(door);
+            return;
+        }
+        this.finished = true;
+        Sfx.check();
+        this.completeResult = { travel: true, index: this.levelIndex, name: this.level.name, chapter: this.level.chapter, door: def.id, target: def.to, newAbilities: [] };
+        this.completeTimer = COMPLETE_DELAY;
+    }
+
+    // Leva o jogador para o outro lado de uma passagem ({ room, door }), mantendo a vida.
+    arrive(target) {
+        const spot = arrivalAt(target);
+        const hp = this.player && !this.player.dead ? this.player.hp : PLAYER_HP;
+        const fromX = this.player ? this.player.x : 0;
+        const to = ROOMS[target.room];
+        const face = spot && spot.x < to.grid.w / 2 ? 1 : -1;
+        this.load(target.room, spot ? { x: spot.x, y: spot.y, hp, face, door: target.door, fromX } : null);
+    }
+
+    // O jogador está descansando em um checkpoint (permite viajar pelo mapa).
+    atFlag() {
+        const p = this.player;
+        if (!p || p.dead || this.finished) return null;
+        const cx = p.x;
+        const cy = p.y + PH / 2;
+        return this.flags.find(f => overlap(cx, cy, PW, PH, f.x, f.y + 0.8, 1.6, 1.8)) || null;
     }
 
     collectBerry(b) {
         b.got = true;
         b.mesh.visible = false;
         this.levelBerries++;
+        if (b.tx !== undefined) this.keepKey('collected', b.tx, b.ty);
         Sfx.berry();
         this.view.emit(b.x, b.y, 0xff2d55, 20, 6, 0.7);
         const d = Save.data;
         if (d) {
             d.berries++;
             Save.save();
-            if (d.berries >= 5) this.unlock('berry_5');
+            if (d.berries >= 100) this.unlock('berry_100');
             this.syncProgress();
         }
-        if (this.levelBerries === this.totalBerries) this.unlock('berry_all');
     }
 
     activateFlag(f, p) {
@@ -600,17 +837,20 @@ export class Game {
         Sfx.check();
         this.view.emit(f.x, f.y + 1.3, 0x3ddc84, 20, 5, 0.7);
         const d = Save.data;
+        // Cada checkpoint é um save e vira um ponto de viagem no mapa.
+        if (d) d.world.flags[roomKey(this.levelIndex, f.x, f.y)] = { level: this.levelIndex, x: f.x, y: f.y };
         this.saveCheckpoint(f.x, f.y);
         this.abilities.onCheckpoint();
+        this.lastStandSpent = false;
         if (this.hooks.onCheckpoint) this.hooks.onCheckpoint();
     }
 
+    // No mundo aberto vale sempre o último checkpoint tocado, em qualquer sala.
     saveCheckpoint(x, y) {
         const d = Save.data;
         if (!d) return;
-        const elsewhere = d.checkpoint && d.checkpoint.level !== this.levelIndex;
-        if (elsewhere && this.levelIndex < d.checkpoint.level) return;
         d.checkpoint = { level: this.levelIndex, x, y, time: this.time };
+        this.flushPlaytime();
         Save.save();
     }
 
@@ -676,11 +916,11 @@ export class Game {
         if (d) {
             d.stomps++;
             Save.save();
-            if (d.stomps >= 5) this.unlock('stomp_5');
+            if (d.stomps >= 100) this.unlock('stomp_100');
             this.syncProgress();
         }
         this.abilities.onKill(kind, p);
-        if (kind === 'dash' || kind === 'blade') this.unlock('dash_dmg');
+        if (!p.onGround && ++this.airKills >= 3) this.unlock('air_chain');
         if (kind === 'stomp') {
             p.vy = STOMP_BOUNCE;
             p.jumping = true;
@@ -725,6 +965,7 @@ export class Game {
         const k = this.world.key(tx, ty);
         if (this.world.broken.has(k)) return;
         this.world.broken.add(k);
+        this.keepKey('broken', tx, ty);
         const block = this.specialBlocks.get(k);
         if (block) block.mesh.visible = false;
         Sfx.shatter();
@@ -768,6 +1009,7 @@ export class Game {
         }
         this.unlock('secret_area');
         if (secret.trial) this.unlock('trial_ch3');
+        if (d && Object.keys(d.secrets).length >= TOTAL_SECRETS) this.unlock('secrets_all');
         this.syncProgress();
         if (this.hooks.onSecret) this.hooks.onSecret(secret.label || 'Área secreta encontrada');
     }
@@ -842,14 +1084,18 @@ export class Game {
         this.gate.mesh.visible = false;
         this.player.hp = PLAYER_HP;
         if (this.goal) {
-            this.goal.mesh.visible = true;
+            // A passagem para a próxima região se abre: a laje sobe devagar.
+            this.setDoorOpen(this.goal, true, true);
             this.view.emit(this.goal.x, this.goal.y + 1, 0xffd23f, 50, 8, 1.2);
+            this.shake(0.35);
         }
         Sfx.win();
         Sfx.setTheme(this.level.chapter);
         this.hooks.onBossEnd && this.hooks.onBossEnd();
         this.unlock(this.level.boss);
         if (!this.bossDamageTaken) this.unlock('boss_nodmg');
+        const feat = this.boss.featEarned && this.boss.featEarned();
+        if (feat) this.unlock(feat);
         const a = this.level.arena;
         const end = this.boss.dyingPoint();
         let restX = Math.max(a.x1 + 3, Math.min(a.x2 - 3, end.x));
@@ -858,12 +1104,44 @@ export class Game {
         if (!this.aftermath && this.hooks.onBossEpilogue) this.hooks.onBossEpilogue();
     }
 
-    complete() {
+    // Conquistas de conclusão de fase e capítulo. `cleanChapter`: capítulo jogado em sequência sem morrer.
+    unlockCompletion(i, ch, lastOfChapter, cleanChapter) {
+        const d = Save.data;
+        if (i === 0) this.unlock('first_steps');
+        if (i === 0 && this.time < 40) this.unlock('speed');
+        if (realmOfChapter(ch) === 'inferno' && !this.levelHurt) this.unlock('unscathed');
+        if (d && this.chapterHarvested(d, ch)) this.unlock('berry_chapter');
+        if (!lastOfChapter || !d) return;
+        if (!d.completedChapters.includes(ch)) d.completedChapters.push(ch);
+        this.unlock('chapter_done');
+        if (cleanChapter) this.unlock('no_death_chapter');
+        if (ch === 3) {
+            this.unlock('summit');
+            if (d.mode === 'permadeath') this.unlock('iron_mountain');
+        }
+        if (ch === 4) this.unlock('inferno_gate');
+        if (ch === 5) this.unlock('sky_reached');
+        const mountain = REALMS.montanha.chapters;
+        if (d.deaths === 0 && mountain.every(c => d.completedChapters.includes(c))) this.unlock('no_death_all');
+    }
+
+    chapterHarvested(d, ch) {
+        return LEVELS.every((level, index) => {
+            if (level.chapter !== ch) return true;
+            const total = level.grid.cells.flat().filter(c => c === 'S').length;
+            return !!d.best[index] && d.best[index].berries >= total;
+        });
+    }
+
+    // Saída de uma fase principal. Registra a conclusão (sem tela de resultado) e agenda a troca de sala.
+    complete(door = this.goal) {
         this.finished = true;
-        Sfx.win();
         const i = this.levelIndex;
         const ch = this.level.chapter;
         const d = Save.data;
+        const firstClear = !d || !isLevelDone(d, i);
+        if (firstClear) Sfx.win();
+        else Sfx.check();
         let record = false;
         if (d) {
             d.unlocked = Math.max(d.unlocked, Math.min(LEVELS.length, i + 2));
@@ -873,25 +1151,15 @@ export class Game {
                 time: record ? this.time : prev.time,
                 berries: Math.max(this.levelBerries, prev ? prev.berries : 0)
             };
-            if (d.checkpoint && d.checkpoint.level === i) d.checkpoint = null;
             this.flushPlaytime();
         }
-        this.view.emit(this.goal.x, this.goal.y + 1, 0xffd23f, 60, 8, 1.2);
-        if (i === 0) this.unlock('first_steps');
-        if (i === 0 && this.time < 40) this.unlock('speed');
-        if (this.levelDeaths === 0) this.unlock('no_death');
+        if (door) this.view.emit(door.x, door.y + 1, 0xffd23f, 60, 8, 1.2);
         const lastOfChapter = i === LEVELS.length - 1 || LEVELS[i + 1].chapter !== ch;
-        if (lastOfChapter && d) {
-            if (!d.completedChapters.includes(ch)) d.completedChapters.push(ch);
-            this.unlock('ch' + ch + '_complete');
-            if (d.chapterDeaths[ch - 1] === 0) this.unlock('no_death_ch' + ch);
-        }
+        const run = d && d.skins.run;
+        const cleanChapter = lastOfChapter && !!run && run.next === i && run.clean;
+        this.unlockCompletion(i, ch, lastOfChapter, cleanChapter);
         const skin = d ? Save.finishRunLevel(i, lastOfChapter) : null;
-        if (i === LEVELS.length - 1) {
-            this.unlock('summit');
-            this.unlock('summit_complete');
-        }
-        if (d && d.deaths === 0 && d.completedChapters.length === 3) this.unlock('no_death_all');
+        const realmChanged = d ? Save.syncRealm() : false;
         if (i >= 2) this.grantSkill('double_jump');
         if (i >= 5) this.grantSkill('air_dash');
         if (i >= 9) this.grantSkill('ground_pound');
@@ -913,14 +1181,20 @@ export class Game {
             lastOfChapter,
             last: i === LEVELS.length - 1,
             newAbilities: this.newAbilities,
-            skin
+            skin,
+            realmChanged,
+            realm: d ? d.realm : realmOfChapter(ch),
+            firstClear,
+            door: door ? door.def.id : null,
+            target: door ? door.def.to : null
         };
         this.completeTimer = COMPLETE_DELAY;
     }
 
     fireComplete() {
         this.running = false;
-        this.hooks.onComplete(this.completeResult);
+        const hook = this.hooks.onDoor || this.hooks.onComplete;
+        if (hook) hook(this.completeResult);
     }
 
     followCamera(dt) {
@@ -942,9 +1216,13 @@ export class Game {
         const t = performance.now() / 1000;
         E.animatePlayer(this.playerMesh, p, playerPose(p), dt, t);
         this.abilities.sync(t);
-        if (this.goal) {
-            E.animateGoal(this.goal.mesh, t);
-            this.goal.mesh.position.y = this.goal.y + Math.sin(t * 2) * 0.1;
+        for (const door of this.doors) {
+            if (!door.mesh) continue;
+            if (door.mesh.userData.lift !== door.lift) {
+                E.setPassageLift(door.mesh, door.lift);
+                if (door.opening > 0 && Math.random() < 0.5) this.view.emit(door.x + (Math.random() - 0.5) * 1.4, door.y + 0.1, 0xbfb6a6, 1, 2, 0.4);
+            }
+            E.animatePassage(door.mesh, t);
         }
         this.berries.forEach((b, i) => { b.mesh.position.y = b.y + Math.sin(t * 3 + i) * 0.12; E.animateBerry(b.mesh, t, i); });
         this.crystals.forEach(c => { E.animateCrystal(c.mesh, t); });

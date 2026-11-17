@@ -1,6 +1,13 @@
 import { ABILITIES, LOADOUT_SIZE, abilityById, meetsReq } from './abilities.js';
 import { TOTAL_RECORDS, recordsFound, sanitizeStory } from './story.js';
 import { DEFAULT_SKIN, SKINS, skinById, skinForChapter } from './skins.js';
+import { LEVELS } from './levels.js';
+import { CHAPTERS, CHAPTER_STARTS, REALM_IDS, chapterOfLevel, realmForProgress } from './realms.js';
+import { ACHIEVEMENTS, achievementById, sanitizeAchievements } from './achievements.js';
+import { TOTAL_SECRETS } from './campaign.js';
+import { isRoom } from './worldMap.js';
+
+export { ACHIEVEMENTS, chapterOfLevel };
 
 const PAD_MAP = [
     [0, 'PadJump'], [1, 'PadDash'], [2, 'PadDash'], [3, 'PadSkill3'], [4, 'PadSkill1'], [5, 'PadSkill2'],
@@ -62,56 +69,33 @@ export const Input = {
     }
 };
 
-export const ACHIEVEMENTS = [
-    { id: 'first_steps', icon: 'boot', name: 'Primeiros Passos', desc: 'Complete a primeira fase.', secret: false },
-    { id: 'berry_5', icon: 'berry', name: 'Colecionador', desc: 'Pegue 5 morangos no total.', secret: false },
-    { id: 'berry_all', icon: 'berry', name: 'Banquete', desc: 'Pegue todos os morangos de uma fase.', secret: false },
-    { id: 'die_10', icon: 'skull', name: 'Persistente', desc: 'Morra 10 vezes.', secret: false },
-    { id: 'die_50', icon: 'skull', name: 'Imortal Demais', desc: 'Morra 50 vezes.', secret: false },
-    { id: 'stomp_5', icon: 'boot', name: 'Pisa Forte', desc: 'Derrote 5 inimigos.', secret: false },
-    { id: 'dash_dmg', icon: 'bolt', name: 'Investida Mortal', desc: 'Derrote um inimigo com o dash.', secret: false },
-    { id: 'spring', icon: 'spring', name: 'Boing!', desc: 'Use uma mola.', secret: false },
-    { id: 'crystal_10', icon: 'crystal', name: 'Energia Pura', desc: 'Use 10 cristais de dash.', secret: false },
-    { id: 'no_death', icon: 'shield', name: 'Impecável', desc: 'Complete uma fase sem morrer.', secret: false },
-    { id: 'speed', icon: 'clock', name: 'Velocista', desc: 'Complete a fase 1 em menos de 40s.', secret: false },
-    { id: 'summit', icon: 'peak', name: 'No Cume', desc: 'Complete a última fase.', secret: false },
-    { id: 'ch1_complete', icon: 'flag', name: 'Capítulo 1 Concluído', desc: 'Conclua o Capítulo 1.', secret: false },
-    { id: 'ch2_complete', icon: 'flag', name: 'Capítulo 2 Concluído', desc: 'Conclua o Capítulo 2.', secret: false },
-    { id: 'ch3_complete', icon: 'flag', name: 'Capítulo 3 Concluído', desc: 'Conclua o Capítulo 3.', secret: false },
-    { id: 'summit_complete', icon: 'crown', name: 'Summit Completo', desc: 'Conclua todos os capítulos.', secret: false },
-    { id: 'no_death_ch1', icon: 'shield', name: 'Impecável I', desc: 'Conclua o Capítulo 1 sem morrer.', secret: false },
-    { id: 'no_death_ch2', icon: 'shield', name: 'Impecável II', desc: 'Conclua o Capítulo 2 sem morrer.', secret: false },
-    { id: 'no_death_ch3', icon: 'shield', name: 'Impecável III', desc: 'Conclua o Capítulo 3 sem morrer.', secret: false },
-    { id: 'no_death_all', icon: 'trophy', name: 'Perfeição', desc: 'Conclua os três capítulos sem morrer nenhuma vez.', secret: false },
-    { id: 'first_death', icon: 'skull', name: 'Primeira Queda', desc: 'Morra pela primeira vez.', secret: false },
-    { id: 'die_spike', icon: 'spike', name: 'Espinho Fatal', desc: 'Morra em espinhos.', secret: true },
-    { id: 'die_fall', icon: 'pit', name: 'Queda Livre', desc: 'Morra caindo.', secret: true },
-    { id: 'boss1', icon: 'boss', name: 'Caçador do Pico', desc: 'Derrote o chefe do Capítulo 1.', secret: false },
-    { id: 'boss2', icon: 'boss', name: 'Tempestade Vencida', desc: 'Derrote o chefe do Capítulo 2.', secret: false },
-    { id: 'boss3', icon: 'boss', name: 'Cume Conquistado', desc: 'Derrote o chefe final.', secret: false },
-    { id: 'boss_nodmg', icon: 'star', name: 'Intocável', desc: 'Derrote um chefe sem receber dano.', secret: true },
-    { id: 'secret_area', icon: 'eye', name: 'Explorador', desc: 'Encontre uma área secreta.', secret: true },
-    { id: 'trial_ch3', icon: 'trophy', name: 'Provação do Núcleo', desc: 'Vença um desafio opcional do Capítulo 3.', secret: true },
-    { id: 'all_skills', icon: 'star', name: 'Mestre', desc: 'Desbloqueie todas as habilidades.', secret: false },
-    { id: 'first_loadout', icon: 'spark', name: 'Bem Preparado', desc: 'Inicie uma fase com 3 habilidades equipadas.', secret: false },
-    { id: 'ability_max', icon: 'spark', name: 'Domínio', desc: 'Evolua uma habilidade até o nível máximo.', secret: false },
-    { id: 'first_record', icon: 'scroll', name: 'Quem Lê', desc: 'Encontre um registro opcional.', secret: false },
-    { id: 'all_records', icon: 'scroll', name: 'Cronista', desc: 'Reúna todos os registros de uma campanha.', secret: false },
-    { id: 'core_reached', icon: 'eye', name: 'O Silêncio', desc: 'Responda à pergunta do Núcleo.', secret: true }
-];
+// Números derivados do save usados pelas barras de progresso das conquistas.
+function progressStats(d) {
+    return {
+        berries: d.berries || 0,
+        stomps: d.stomps || 0,
+        crystals: d.crystals || 0,
+        parries: d.parries || 0,
+        dodges: d.dodges || 0,
+        maxedAbilities: ABILITIES.filter(a => (d.abilities || {})[a.id] >= a.levels.length).length,
+        unlockedPowers: (d.skills || []).length + Object.keys(d.abilities || {}).length,
+        totalPowers: SKILLS.length + ABILITIES.length,
+        secretCount: Object.keys(d.secrets || {}).length,
+        totalSecrets: TOTAL_SECRETS,
+        recordCount: d.story ? recordsFound(d) : 0,
+        totalRecords: TOTAL_RECORDS
+    };
+}
 
 export function achievementProgress(id, d) {
-    const bar = (cur, goal) => [Math.min(cur, goal), goal];
-    switch (id) {
-        case 'berry_5': return bar(d.berries, 5);
-        case 'die_10': return bar(d.deaths, 10);
-        case 'die_50': return bar(d.deaths, 50);
-        case 'stomp_5': return bar(d.stomps, 5);
-        case 'crystal_10': return bar(d.crystals, 10);
-        case 'all_records': return bar(recordsFound(d), TOTAL_RECORDS);
-        case 'all_skills': return bar(d.skills.length + Object.keys(d.abilities).length, SKILLS.length + ABILITIES.length);
-        default: return null;
-    }
+    const a = achievementById(id);
+    if (!a || !a.goal) return null;
+    const [cur, goal] = a.goal(progressStats(d));
+    return [Math.min(cur, goal), goal];
+}
+
+export function maxedAbilityCount(d) {
+    return progressStats(d).maxedAbilities;
 }
 
 export const SKILLS = [
@@ -122,17 +106,26 @@ export const SKILLS = [
     { id: 'ground_pound', icon: 'peak', name: 'Pancada no Chão', desc: '↓ + Pular no ar: ataque em área que quebra pisos rachados.', unlock: 'Após a fase 10' }
 ];
 
-const SAVE_VERSION = 4;
+// v7: mundo aberto. Salas visitadas, checkpoints de viagem, coletas e paredes quebradas por sala.
+const SAVE_VERSION = 7;
+// Última fase que existia antes do Céu: quem já a venceu precisa ter a fase seguinte aberta.
+const LAST_LEVEL_V5 = 14;
 const SLOT_COUNT = 3;
-const LEVEL_COUNT = 12;
+const LEVEL_COUNT = LEVELS.length;
+const CHAPTER_COUNT = Math.max(...CHAPTERS);
 const FIRST_REDESIGNED_LEVEL = 5;
-const CHAPTER_STARTS = [0, 5, 9];
 const slotKey = i => 'summit_slot_' + i;
 const backupKey = i => slotKey(i) + '_bak';
 const ACTIVE_KEY = 'summit_active_slot';
+const MENU_REALM_KEY = 'summit_menu_realm';
 
-export function chapterOfLevel(index) {
-    return index >= CHAPTER_STARTS[2] ? 3 : index >= CHAPTER_STARTS[1] ? 2 : 1;
+// O reino exibido pela central nunca regride: vale o mais avançado entre o salvo e o do progresso.
+// A exceção é o save zerado, em que o jogador escolhe livremente a região.
+function sanitizeRealm(raw, unlocked, cleared = false) {
+    if (cleared && REALM_IDS.includes(raw)) return raw;
+    const reached = realmForProgress(unlocked);
+    const stored = REALM_IDS.includes(raw) ? raw : reached;
+    return REALM_IDS.indexOf(stored) > REALM_IDS.indexOf(reached) ? stored : reached;
 }
 
 const num = (v, fallback = 0) => (typeof v === 'number' && Number.isFinite(v) && v >= 0 ? v : fallback);
@@ -163,7 +156,9 @@ export function sanitizeSave(raw) {
     if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
     const now = Date.now();
     const version = raw.version || 1;
-    const unlocked = Math.min(LEVEL_COUNT, Math.max(1, Math.floor(num(raw.unlocked, 1))));
+    const beatLastV5 = version < 6 && !!obj(raw.best)[LAST_LEVEL_V5];
+    const unlocked = Math.min(LEVEL_COUNT, Math.max(beatLastV5 ? LAST_LEVEL_V5 + 2 : 1, Math.floor(num(raw.unlocked, 1))));
+    const cleared = raw.cleared === true;
     const currentLevel = Math.min(unlocked - 1, Math.floor(num(raw.currentLevel, 0)));
     const skills = new Set(skillsForProgress(unlocked));
     const best = obj(raw.best);
@@ -181,24 +176,59 @@ export function sanitizeSave(raw) {
         unlocked,
         currentLevel,
         deaths: num(raw.deaths),
-        chapterDeaths: [0, 1, 2].map(i => num(Array.isArray(raw.chapterDeaths) ? raw.chapterDeaths[i] : 0)),
+        chapterDeaths: Array.from({ length: CHAPTER_COUNT }, (_, i) => num(Array.isArray(raw.chapterDeaths) ? raw.chapterDeaths[i] : 0)),
         berries: num(raw.berries),
         stomps: num(raw.stomps),
         crystals: num(raw.crystals),
         best,
-        achievements: obj(raw.achievements),
+        achievements: sanitizeAchievements(raw.achievements),
         skills: [...skills],
         totalTime: num(raw.totalTime),
-        completedChapters: Array.isArray(raw.completedChapters) ? raw.completedChapters.filter(n => [1, 2, 3].includes(n)) : [],
+        completedChapters: Array.isArray(raw.completedChapters) ? [...new Set(raw.completedChapters.filter(n => CHAPTERS.includes(n)))] : [],
         secrets: obj(raw.secrets),
-        checkpoint: validCheckpoint ? { level: cp.level, x: cp.x, y: cp.y, time: num(cp.time) } : null,
-        abilityUses: num(raw.abilityUses)
+        checkpoint: validCheckpoint && isRoom(cp.level) ? { level: cp.level, x: cp.x, y: cp.y, time: num(cp.time) } : null,
+        abilityUses: num(raw.abilityUses),
+        parries: num(raw.parries),
+        dodges: num(raw.dodges),
+        realm: sanitizeRealm(raw.realm, unlocked, cleared),
+        cleared
     };
     sanitizeAbilities(data, raw);
+    data.world = sanitizeWorld(raw.world, data);
     data.skins = sanitizeSkins(raw.skins, data);
     data.story = sanitizeStory(raw.story, data, version);
     return data;
 }
+
+// Chaves de coleta e de paredes: "sala:x,y". Salas abaixo do progresso contam como visitadas.
+const ROOM_KEY = /^\d+:-?\d+(\.\d+)?,-?\d+(\.\d+)?$/;
+const roomKeyOk = k => ROOM_KEY.test(k) && isRoom(+k.split(':')[0]);
+
+function trueKeys(raw, valid) {
+    const out = {};
+    for (const [k, v] of Object.entries(obj(raw))) if (v === true && valid(k)) out[k] = true;
+    return out;
+}
+
+function sanitizeWorld(raw, d) {
+    const w = obj(raw);
+    const visited = trueKeys(w.visited, k => isRoom(+k));
+    for (let i = 0; i < d.unlocked; i++) visited[i] = true;
+    if (d.checkpoint) visited[d.checkpoint.level] = true;
+    const flags = {};
+    for (const [k, f] of Object.entries(obj(w.flags))) {
+        if (f && isRoom(f.level) && Number.isFinite(f.x) && Number.isFinite(f.y)) flags[k] = { level: f.level, x: f.x, y: f.y };
+    }
+    return {
+        visited,
+        flags,
+        collected: trueKeys(w.collected, roomKeyOk),
+        broken: trueKeys(w.broken, roomKeyOk),
+        opened: trueKeys(w.opened, k => /^[a-z_]+$/.test(k))
+    };
+}
+
+export const roomKey = (room, x, y) => `${room}:${x},${y}`;
 
 function sanitizeSkins(raw, d) {
     const s = obj(raw);
@@ -209,7 +239,7 @@ function sanitizeSkins(raw, d) {
     });
     const unlocked = SKINS.filter(k => owned.has(k.id)).map(k => k.id);
     const r = s.run;
-    const run = r && [1, 2, 3].includes(r.chapter) && Number.isInteger(r.next) ? { chapter: r.chapter, next: r.next, clean: r.clean === true } : null;
+    const run = r && CHAPTERS.includes(r.chapter) && Number.isInteger(r.next) ? { chapter: r.chapter, next: r.next, clean: r.clean === true } : null;
     return { unlocked, equipped: unlocked.includes(s.equipped) ? s.equipped : DEFAULT_SKIN, run };
 }
 
@@ -328,6 +358,52 @@ export const Save = {
         else if (run && run.next !== index) d.skins.run = null;
         this.save();
     },
+    // Atualiza o reino da central conforme o progresso. Retorna true quando o reino muda.
+    syncRealm() {
+        const d = this.data;
+        if (!d) return false;
+        const realm = sanitizeRealm(d.realm, d.unlocked, d.cleared);
+        if (realm === d.realm) return false;
+        d.realm = realm;
+        this.setMenuRealm(realm);
+        return true;
+    },
+    // Marca o save como zerado. Só os créditos finais chamam isto.
+    finishGame() {
+        const d = this.data;
+        if (!d) return false;
+        const first = !d.cleared;
+        d.cleared = true;
+        this.save();
+        return first;
+    },
+    anyCleared() {
+        return this.slots.some(s => s && s.cleared);
+    },
+    // Escolha de região de um save zerado; os demais seguem o progresso.
+    chooseRealm(id) {
+        const d = this.data;
+        if (!d || !d.cleared || !REALM_IDS.includes(id)) return false;
+        d.realm = id;
+        this.save();
+        return true;
+    },
+    // O menu aparece antes de escolher o save, então a região dele fica fora dos slots.
+    realmReached(id) {
+        if (id === REALM_IDS[0]) return true;
+        if (!REALM_IDS.includes(id)) return false;
+        return this.slots.some(s => s && (s.cleared || REALM_IDS.indexOf(s.realm) >= REALM_IDS.indexOf(id)));
+    },
+    get menuRealm() {
+        let stored = null;
+        try { stored = localStorage.getItem(MENU_REALM_KEY); } catch (e) {}
+        return this.realmReached(stored) ? stored : REALM_IDS[0];
+    },
+    setMenuRealm(id) {
+        if (!this.realmReached(id)) return false;
+        try { localStorage.setItem(MENU_REALM_KEY, id); } catch (e) {}
+        return true;
+    },
     chapterDeath(chapter) {
         const run = this.data && this.data.skins.run;
         if (run && run.chapter === chapter) run.clean = false;
@@ -434,11 +510,11 @@ const DEFAULT_KEYS = {
     skill3: ['KeyF']
 };
 const PAD_CODE = { jump: 'PadJump', dash: 'PadDash', grab: 'PadGrab', skill1: 'PadSkill1', skill2: 'PadSkill2', skill3: 'PadSkill3' };
-const RESERVED_KEYS = new Set(['Escape', 'Enter', 'Tab', 'KeyP', 'KeyR', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'KeyW', 'KeyA', 'KeyS', 'KeyD']);
+const RESERVED_KEYS = new Set(['Escape', 'Enter', 'Tab', 'KeyI', 'KeyM', 'KeyP', 'KeyR', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'KeyW', 'KeyA', 'KeyS', 'KeyD']);
 const copyKeys = keys => Object.fromEntries(Object.entries(keys).map(([k, v]) => [k, [...v]]));
 
 export const Settings = {
-    master: 1, music: 0.6, sfx: 1, muted: false, shake: true, shadows: true,
+    master: 1, music: 0.6, sfx: 1, muted: false, shake: true, shadows: true, hints: true,
     keys: copyKeys(DEFAULT_KEYS),
     load() {
         let raw = null;
@@ -452,8 +528,8 @@ export const Settings = {
         }
     },
     save() {
-        const { master, music, sfx, muted, shake, shadows, keys } = this;
-        try { localStorage.setItem(SETTINGS_KEY, JSON.stringify({ master, music, sfx, muted, shake, shadows, keys })); } catch (e) {}
+        const { master, music, sfx, muted, shake, shadows, hints, keys } = this;
+        try { localStorage.setItem(SETTINGS_KEY, JSON.stringify({ master, music, sfx, muted, shake, shadows, hints, keys })); } catch (e) {}
     },
     rebind(action, code) {
         if (RESERVED_KEYS.has(code)) return 'Essa tecla é reservada para movimento ou menus. Escolha outra.';

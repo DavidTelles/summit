@@ -223,6 +223,72 @@ const BUILD = {
             hatch(ctx, -0.8, 0.1, 0.8, 0.8, 16, 'rgba(0,0,0,0.5)', 0.014, 15);
         });
         return g;
+    },
+    // Peças do Inferno: ferro escuro, brasa e correntes.
+    chain() {
+        return part('chain', 0.8, 6, ctx => {
+            for (let y = 0.1; y < 5.8; y += 0.34) {
+                shape(ctx, [[-0.1, y], [0.1, y], [0.1, y + 0.26], [-0.1, y + 0.26]], '#4e4955', 0.02);
+            }
+            shape(ctx, [[-0.3, 0, 1], [0.3, 0, 1], [0.24, 0.2, 1], [-0.24, 0.2, 1]], '#2a2328', 0.025);
+        });
+    },
+    brazier() {
+        const bowl = part('brazier', 1.4, 1.6, ctx => {
+            stroke(ctx, [[-0.3, 0], [0, 0.8], [0.3, 0]], 0.06, IRON);
+            shape(ctx, [[-0.55, 0.8, 1], [0.55, 0.8, 1], [0.4, 1.12, 1], [-0.4, 1.12, 1]], '#3a2c2c', 0.03);
+            shape(ctx, [[-0.32, 1.1, 1], [-0.1, 1.5, 1], [0.05, 1.22, 1], [0.18, 1.55, 1], [0.34, 1.1, 1]], '#ff9a3c', 0.02, '#7a2a0a');
+        });
+        const glow = glowSprite(0xff7a2a, 2.2, { opacity: 0.55, layer: L - 1, x: 0, y: 1.25 });
+        const g = new THREE.Group();
+        g.add(glow, bowl);
+        return g;
+    },
+    cage() {
+        return part('cage', 1.6, 2.6, ctx => {
+            stroke(ctx, [[0, 2.5], [0, 2.1]], 0.04, IRON);
+            for (const x of [-0.5, -0.25, 0, 0.25, 0.5]) stroke(ctx, [[x, 0.1], [x * 1.1, 2.0]], 0.035, '#4a3f46');
+            stroke(ctx, [[-0.6, 2.05], [0.6, 2.05]], 0.07, IRON);
+            stroke(ctx, [[-0.55, 0.08], [0.55, 0.08]], 0.07, IRON);
+            shape(ctx, [[-0.2, 0.15, 1], [0.05, 0.4, 1], [0.24, 0.15, 1]], '#d9cdb5', 0.018);
+        });
+    },
+    gateRuin() {
+        return part('gateRuin', 4.4, 5.4, ctx => {
+            const post = x => shape(ctx, [[x - 0.3, 0, 1], [x - 0.24, 4.6, 1], [x + 0.24, 4.6, 1], [x + 0.3, 0, 1]], '#2b2226', 0.04);
+            post(-1.7);
+            post(1.7);
+            shape(ctx, [[-2.1, 4.5], [2.1, 4.5], [1.9, 5.1], [-1.9, 5.1]], '#2b2226', 0.045);
+            for (let x = -1.2; x <= 1.2; x += 0.4) stroke(ctx, [[x, 4.5], [x, 2.2 + Math.abs(x) * 0.6]], 0.06, '#3f3339');
+            stroke(ctx, [[-1.3, 4.8], [1.3, 4.8]], 0.04, '#ff7a3c');
+        });
+    },
+    // Peças do Céu: mármore claro e ouro velho.
+    skyPillar() {
+        return part('skyPillar', 1.6, 5, ctx => {
+            shape(ctx, [[-0.42, 0, 1], [-0.32, 4, 1], [0.32, 4, 1], [0.42, 0, 1]], '#efe9dc', 0.04);
+            for (const x of [-0.16, 0.04, 0.2]) stroke(ctx, [[x, 0.2], [x, 3.8]], 0.02, 'rgba(120,110,150,0.5)');
+            shape(ctx, [[-0.6, 4, 1], [-0.5, 4.4, 1], [0.5, 4.4, 1], [0.6, 4, 1]], '#e8c878', 0.04);
+        });
+    },
+    skyLantern() {
+        const g = new THREE.Group();
+        g.add(glowSprite(0xffe2a0, 2.4, { opacity: 0.4, layer: L - 1, x: 0, y: 1.9 }));
+        g.add(part('skyLantern', 1, 2.6, ctx => {
+            stroke(ctx, [[0, 0], [0, 1.6]], 0.08, '#b8995a');
+            shape(ctx, [[-0.2, 1.6, 1], [-0.26, 2.1, 1], [0, 2.4, 1], [0.26, 2.1, 1], [0.2, 1.6, 1]], '#fff0c0', 0.03);
+        }));
+        return g;
+    },
+    skyArch() {
+        return part('skyArch', 4.6, 5.6, ctx => {
+            for (const x of [-1.7, 1.7]) shape(ctx, [[x - 0.3, 0, 1], [x - 0.24, 3.6, 1], [x + 0.24, 3.6, 1], [x + 0.3, 0, 1]], '#efe9dc', 0.04);
+            ctx.strokeStyle = '#e8c878';
+            ctx.lineWidth = 0.22;
+            ctx.beginPath();
+            ctx.arc(0, 3.6, 1.72, 0, Math.PI);
+            ctx.stroke();
+        });
     }
 };
 

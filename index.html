@@ -41,35 +41,60 @@
     <div class="boss-track"><div id="boss-lag"></div><div id="boss-fill"></div><div id="boss-marks"></div></div>
 </div>
 <div id="banner" class="hidden"><small id="banner-kicker"></small><b id="banner-title"></b><span id="banner-sub"></span></div>
-<div id="checkpoint-note" class="hidden">Checkpoint</div>
+<div id="checkpoint-note" class="hidden">Jogo salvo</div>
+<div id="room-veil"></div>
 <div id="story-line" class="hidden" role="status"><small id="story-who"></small><span id="story-text"></span></div>
+<div id="tutorial-hint" class="hidden" role="status"><small id="hint-who"></small><p id="hint-text"></p></div>
 <div id="cinema" class="hidden"><div id="cine-fade"></div><p id="cine-caption" aria-live="polite"></p><button id="cine-skip" data-act="cine-skip">Pular cena <kbd>Esc</kbd></button><small id="cine-hint">Enter avança</small></div>
 <div id="toasts"></div>
 
 <div id="menu" class="screen menu-cinematic">
     <div class="menu-top">
-        <svg class="logo-peak" viewBox="0 0 220 44" aria-hidden="true"><path d="M2 42 L60 22 L84 30 L110 3 L134 28 L160 19 L218 42" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M110 3 L103 20 L110 16 L117 24" fill="none" stroke="currentColor" stroke-width="1.2"/></svg>
-        <h1 class="logo">SUMMIT</h1>
-        <p class="tagline">A jornada de Kael até o coração do Cume</p>
+        <div id="menu-logo"></div>
+        <h1 class="logo" id="menu-title">SUMMIT</h1>
+        <p class="tagline" id="menu-tagline">A jornada de Kael até o coração do Cume</p>
     </div>
     <div class="menu-bottom">
         <div class="menu-options">
             <button data-act="continue">Continuar</button>
             <button data-act="newgame">Novo Jogo</button>
+            <button data-act="regions" id="btn-regions" class="hidden">Regiões</button>
             <button data-act="options">Opções</button>
         </div>
     </div>
     <div class="menu-version">v2.0</div>
 </div>
 
+<div id="regions" class="screen hidden">
+    <h2>Regiões</h2>
+    <p>Escolha onde quer estar. O menu e as campanhas zeradas passam a abrir nesse lugar.</p>
+    <div id="region-list" class="region-list"></div>
+    <button class="btn" data-act="back">Voltar</button>
+</div>
+
+<div id="realm-veil"></div>
+
+<div id="ending" class="hidden">
+    <div id="ending-roll">
+        <h2>Summit</h2>
+        <p class="ending-sub">A jornada de Kael</p>
+        <h3>A Montanha</h3><p>A Subida · A Tempestade · O Núcleo</p>
+        <h3>O Inferno</h3><p>Os Portões</p>
+        <h3>O Céu</h3><p>O Alto</p>
+        <h3>Os que ficaram</h3><p>Varak, que ficou para guardar</p><p>Aethos, que ficou para olhar</p><p>Oren, que ensinou cada salto</p>
+        <h3>Técnica</h3><p>Modelos, música e efeitos gerados por código</p><p>Motor gráfico: three.js (licença MIT)</p>
+        <p class="ending-last">Obrigado por subir, descer e subir de novo.</p>
+    </div>
+    <button id="ending-skip" data-act="ending-skip">Pular créditos <kbd>Esc</kbd></button>
+</div>
+
 <div id="saves" class="screen hidden">
     <h2 id="saves-title">Saves</h2>
     <div class="saves-body">
         <div id="save-list"></div>
-        <aside class="showcase" aria-label="Protagonista e skins">
-            <div id="showcase-stage" class="showcase-stage"><span class="showcase-hint">Arraste para girar</span></div>
+        <aside class="showcase" aria-label="Protagonista">
+            <div id="showcase-stage" class="showcase-stage"><span class="showcase-hint">Arraste para girar · clique duas vezes para trocar a skin</span></div>
             <div class="showcase-info"><small id="showcase-slot"></small><h3 id="showcase-name"></h3><p id="showcase-note"></p></div>
-            <div id="showcase-skins" class="skin-grid"></div>
         </aside>
     </div>
     <button class="btn" data-act="back">Voltar</button>
@@ -87,7 +112,7 @@
 
 <div id="credits" class="screen hidden">
     <h2>Créditos</h2>
-    <p>Summit — uma jornada em três capítulos.</p>
+    <p>Summit — uma jornada em cinco capítulos, da Montanha ao Céu.</p>
     <p class="tip">Modelos, música e efeitos sonoros gerados por código. Motor gráfico: three.js (licença MIT).</p>
     <button data-act="back">Voltar</button>
 </div>
@@ -101,27 +126,34 @@
     </div>
 </div>
 
-<div id="pause" class="screen hidden">
-    <h2>Pausado</h2>
-    <div id="pause-info" class="stat-row"></div>
-    <div class="buttons">
-        <button data-act="resume">Continuar</button>
-        <button data-act="restart">Reiniciar fase</button>
-        <button data-act="options">Opções</button>
-        <button data-act="to-hub">Voltar à central</button>
+<div id="pause" class="screen hidden inv">
+    <div class="inv-shell" role="dialog" aria-label="Inventário">
+        <header class="inv-top">
+            <div class="inv-where"><small id="inv-kicker"></small><b id="inv-room"></b></div>
+            <div id="inv-info" class="inv-info"></div>
+        </header>
+        <nav id="inv-tabs" class="inv-tabs" aria-label="Abas do inventário"></nav>
+        <section id="inv-panel" class="inv-panel"></section>
+        <footer class="inv-foot">
+            <span class="inv-hint"><kbd>Q</kbd><kbd>E</kbd> trocam de aba · <kbd>Esc</kbd> volta ao jogo</span>
+            <span class="spacer"></span>
+            <button class="btn" data-act="skins">Skins</button>
+            <button class="btn" data-act="to-checkpoint">Voltar ao checkpoint</button>
+            <button class="btn" data-act="to-hub">Sair para a central</button>
+            <button class="btn btn-primary" data-act="resume">Continuar</button>
+        </footer>
     </div>
 </div>
 
-<div id="complete" class="screen hidden">
-    <small id="complete-kicker"></small>
-    <h2 id="complete-title">Fase completa!</h2>
-    <div id="complete-stats" class="stat-row"></div>
-    <div id="complete-unlocks" class="hidden"></div>
-    <div class="buttons">
-        <button data-act="next" id="btn-next">Próxima fase</button>
-        <button data-act="replay">Jogar de novo</button>
-        <button data-act="to-hub">Voltar à central</button>
+<div id="skins" class="screen hidden">
+    <h2>Skins</h2>
+    <p>Equipe uma skin desbloqueada. Ela fica salva neste save.</p>
+    <div class="skins-body">
+        <div id="skins-stage" class="showcase-stage skins-stage"><span class="showcase-hint" id="skins-name"></span></div>
+        <div class="showcase-info"><small id="skins-slot"></small><p id="skins-note"></p></div>
+        <div id="skins-grid" class="skin-grid"></div>
     </div>
+    <button class="btn" data-act="back">Voltar</button>
 </div>
 
 <div id="hub" class="screen hidden" data-chapter="1">
@@ -129,7 +161,21 @@
         <path class="ridge ridge-far" d="M0 620 170 470l120 90 190-210 150 150 130-90 210 190 180-260 200 210 130-110 120 90v360H0z"/>
         <path class="ridge ridge-mid" d="M0 720 210 590l150 90 170-150 210 170 180-120 170 130 230-190 280 200v180H0z"/>
         <path class="ridge ridge-near" d="M0 820 240 730l210 70 260-110 240 110 200-70 240 90 210-50v130H0z"/>
+        <g class="realm-inferno">
+            <path class="inf-glow" d="M0 900V760c160 30 330-20 520 10s380 60 560 20 340-50 520-10v130z"/>
+            <path class="inf-lava" d="M0 900V842c120-18 260 14 420-4s300-30 460-6 310 26 460 4 200-12 260-6v70z"/>
+            <path class="inf-gate" d="M1120 760V470h26v-40h-26v-22h180v22h-26v40h26v290h-46V500h-88v260zM1172 500v-56h56v56z"/>
+            <path class="inf-gate" d="M210 780V560l40-48 40 48v220h-24V600h-32v180z"/>
+            <path class="inf-chain" d="M380 0v410M392 0v380M1460 0v330M1472 0v360M760 0v220"/>
+            <path class="inf-spires" d="M0 760 60 600l30 120 50-200 40 230 70-150 30 160 80-90 60 130v200H0zM1600 760l-70-220-40 150-60-260-50 290-60-120-50 170v190h330z"/>
+        </g>
+        <g class="realm-ceu">
+            <circle class="ceu-sun" cx="1180" cy="250" r="120"/>
+            <path class="ceu-cloud" d="M0 900V700c70-50 150-40 210-6 50-60 150-70 220-20 70-50 170-40 230 20 70-40 160-30 220 20 70-60 170-60 240 0 70-40 150-30 210 10 50-30 120-40 170-14v190z"/>
+            <path class="ceu-column" d="M240 700V430h-16v-22h96v22h-16v270zM1360 690V470h-14v-20h84v20h-14v220z"/>
+        </g>
     </svg>
+    <div class="hub-backdrop hub-embers" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
     <aside class="hub-rail">
         <div class="hub-brand">SUMMIT</div>
         <nav id="hub-nav" aria-label="Seções da campanha"></nav>
@@ -142,30 +188,6 @@
     <div id="hero-stash" class="hidden"><canvas id="hero"></canvas></div>
 </div>
 
-<div id="prep" class="screen hidden" data-chapter="1">
-    <svg class="hub-backdrop" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMax slice" aria-hidden="true">
-        <path class="ridge ridge-far" d="M0 620 170 470l120 90 190-210 150 150 130-90 210 190 180-260 200 210 130-110 120 90v360H0z"/>
-        <path class="ridge ridge-mid" d="M0 720 210 590l150 90 170-150 210 170 180-120 170 130 230-190 280 200v180H0z"/>
-    </svg>
-    <div class="prep-layout">
-        <aside id="prep-info"></aside>
-        <div class="prep-center">
-            <div class="prep-title"><h3>Preparação</h3><span>Escolha até 3 habilidades para levar nesta fase.</span></div>
-            <div id="prep-slots"></div>
-            <div id="prep-grid" class="ab-grid"></div>
-            <small id="prep-locked"></small>
-        </div>
-        <aside id="prep-detail" class="detail"></aside>
-    </div>
-    <footer class="prep-actions">
-        <button class="btn" data-act="prep-back">Voltar</button>
-        <button class="btn" data-act="prep-clear" id="btn-prep-clear">Remover seleção</button>
-        <span class="spacer"></span>
-        <button class="btn hidden" data-act="prep-restart" id="btn-prep-restart">Recomeçar do início</button>
-        <button class="btn btn-primary btn-start" data-act="prep-start" id="btn-prep-start"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M6 3l14 9-14 9z"/></svg><span id="btn-prep-start-label">Iniciar Fase</span></button>
-    </footer>
-</div>
-
 <div id="options" class="screen hidden">
     <h2>Opções</h2>
     <div id="options-host"></div>
@@ -174,24 +196,27 @@
 
 <div id="settings-stash" class="hidden">
     <div id="settings-body">
-        <section class="set-group">
+        <section class="set-group" data-section="audio">
             <h3>Áudio</h3>
             <label>Volume geral <input type="range" id="vol-master" min="0" max="1" step="0.05"></label>
             <label>Música <input type="range" id="vol-music" min="0" max="1" step="0.05"></label>
             <label>Efeitos <input type="range" id="vol-sfx" min="0" max="1" step="0.05"></label>
             <button class="btn" data-act="mute" id="btn-mute"></button>
         </section>
-        <section class="set-group">
-            <h3>Gráficos</h3>
+        <section class="set-group" data-section="gameplay">
+            <h3>Jogabilidade e imagem</h3>
+            <button class="btn" data-act="toggle-hints" id="btn-hints"></button>
             <button class="btn" data-act="toggle-shake" id="btn-shake"></button>
             <button class="btn" data-act="toggle-shadows" id="btn-shadows"></button>
             <button class="btn" data-act="fullscreen">Tela cheia</button>
-            <h3 class="spaced">Idioma</h3>
+        </section>
+        <section class="set-group" data-section="misc">
+            <h3>Idioma</h3>
             <p class="set-note">Português (Brasil) é o único idioma disponível nesta versão.</p>
             <h3 class="spaced">Sobre</h3>
             <button class="btn" data-act="credits">Créditos</button>
         </section>
-        <section class="set-group set-wide">
+        <section class="set-group set-wide" data-section="controls">
             <h3>Controles</h3>
             <div id="bind-list"></div>
             <button class="btn" data-act="reset-keys">Restaurar teclas padrão</button>
@@ -200,13 +225,14 @@
                 <tr><td>Escalar</td><td>Agarrar + ↑ ↓</td></tr>
                 <tr><td>Pulo na parede</td><td>Pular encostado na parede</td></tr>
                 <tr><td>Pancada no chão</td><td>↓ + Pular no ar</td></tr>
-                <tr><td>Reiniciar fase</td><td>R</td></tr>
-                <tr><td>Pausar</td><td>Esc ou P</td></tr>
-                <tr><td>Controle</td><td>A pular · B/X dash · LB, RB, Y habilidades · gatilhos agarrar</td></tr>
+                <tr><td>Voltar ao último checkpoint</td><td>R</td></tr>
+                <tr><td>Inventário (habilidades, mapa, opções)</td><td>Esc, P, Tab ou I</td></tr>
+                <tr><td>Mapa</td><td>M</td></tr>
+                <tr><td>Controle</td><td>A pular · B/X dash · LB, RB, Y habilidades · gatilhos agarrar · Start inventário</td></tr>
             </table>
             <p class="set-note">Pise nos inimigos ou acerte-os com o dash. Escudos só caem por trás ou por cima. Cristais recarregam o dash no ar. Paredes rachadas cedem ao dash. Morangos são opcionais.</p>
         </section>
-        <section class="set-group set-wide" id="settings-danger">
+        <section class="set-group set-wide" id="settings-danger" data-section="danger">
             <h3>Campanha</h3>
             <button class="btn btn-danger" data-act="reset">Apagar esta campanha</button>
         </section>

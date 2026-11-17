@@ -10,9 +10,15 @@ const CHORDS = {
 };
 CHORDS.cine_intro = [[147, 220, 294], [131, 196, 262], [165, 220, 330], [123, 185, 247]];
 CHORDS.cine_final = [[110, 165, 220], [98, 147, 196], [131, 196, 262], [110, 165, 247]];
+// Inferno: acordes graves com trítono e um pulso surdo, como um coração embaixo do chão.
+CHORDS[4] = [[87, 104, 123], [82, 98, 123], [92, 110, 131], [78, 98, 117]];
+CHORDS.boss_inferno = [[73, 87, 110], [78, 92, 117], [69, 82, 104], [73, 92, 110]];
+// Céu: acordes abertos e agudos, sem peso no grave, como um coro distante.
+CHORDS[5] = [[262, 392, 587], [294, 440, 659], [220, 330, 494], [247, 370, 554]];
+CHORDS.boss_ceu = [[196, 294, 440], [185, 277, 415], [220, 330, 494], [175, 262, 392]];
 const BEAT = {
     cine_intro: 3.4,
-    cine_final: 5.2, 1: 2.4, 2: 2.0, 3: 1.7, boss: 0.46, boss2: 0.34, boss3: 0.58 };
+    cine_final: 5.2, 1: 2.4, 2: 2.0, 3: 1.7, 4: 2.1, 5: 3.0, boss: 0.46, boss2: 0.34, boss3: 0.58, boss_inferno: 0.4, boss_ceu: 0.42 };
 const LOOKAHEAD = 0.5;
 
 export const Sfx = {
@@ -144,6 +150,35 @@ export const Sfx = {
             if (this.bar % 4 === 3) this.tone(34, 0.26, 'sine', 0.3, -6, delay, this.musicBus);
             return;
         }
+        if (this.theme === 'boss_inferno') {
+            const root = chords[Math.floor(this.bar / 8) % chords.length];
+            this.tone(root[0] / 2, beat * 0.8, 'sawtooth', 0.08, 0, delay, this.musicBus);
+            if (this.bar % 2 === 0) this.tone(44, 0.22, 'sine', 0.34, -14, delay, this.musicBus);
+            if (this.bar % 4 === 3) this.noise(0.12, 1800, 0.05, 2, 0, delay);
+            if (this.bar % 8 === 7) this.tone(root[1] * 2, beat * 1.8, 'square', 0.022, -30, delay, this.musicBus);
+            return;
+        }
+        if (this.theme === 'boss_ceu') {
+            const root = chords[Math.floor(this.bar / 8) % chords.length];
+            root.forEach((f, i) => { if (this.bar % 3 === i) this.tone(f, beat * 0.9, 'triangle', 0.05, 0, delay, this.musicBus); });
+            if (this.bar % 2 === 0) this.tone(root[0] / 2, 0.2, 'sine', 0.2, -10, delay, this.musicBus);
+            if (this.bar % 8 === 7) this.tone(root[2] * 2, beat * 2.4, 'sine', 0.03, 0, delay, this.musicBus);
+            return;
+        }
+        if (this.theme === 5) {
+            const chord = chords[this.bar % chords.length];
+            chord.forEach(f => this.tone(f, beat * 1.5, 'sine', 0.03, 0, delay, this.musicBus));
+            if (this.bar % 2 === 1) [chord[2] * 2, chord[1] * 2].forEach((f, i) => this.tone(f, 1.6, 'sine', 0.012, 0, delay + i * 0.5, this.musicBus));
+            return;
+        }
+        if (this.theme === 4) {
+            const chord = chords[this.bar % chords.length];
+            chord.forEach(f => this.tone(f, beat * 1.6, 'sawtooth', 0.022, 0, delay, this.musicBus));
+            this.tone(38, 0.3, 'sine', 0.26, -6, delay, this.musicBus);
+            this.tone(38, 0.3, 'sine', 0.18, -6, delay + 0.32, this.musicBus);
+            if (this.bar % 3 === 2) this.noise(0.4, 600, 0.04, 0.7, 2600, delay + beat * 0.5);
+            return;
+        }
         if (this.theme === 3 && this.bar % 12 >= 10) {
             this.tone(41, beat * 1.4, 'sine', 0.1, -6, delay, this.musicBus);
             return;
@@ -248,7 +283,6 @@ export const Sfx = {
     focusOn() { this.tone(440, 0.4, 'sine', 0.07, 440); this.tone(660, 0.4, 'sine', 0.04, 660); },
     recall() { this.tone(900, 0.26, 'triangle', 0.07, -500); this.tone(600, 0.2, 'sine', 0.05, 500, 0.05); },
     slowOn() { this.tone(500, 0.8, 'sine', 0.1, -380); this.noise(0.6, 600, 0.06, 0.6, 180); },
-    formOn() { [262, 392, 523, 784].forEach((f, i) => this.tone(f, 0.45, 'sawtooth', 0.04, 0, i * 0.05)); this.noise(0.5, 900, 0.12, 0.6, 3400); },
     lastStand() { this.tone(110, 0.6, 'sawtooth', 0.1, 220); [988, 1319].forEach((f, i) => this.tone(f, 0.3, 'triangle', 0.07, 0, 0.12 + i * 0.1)); },
     upgrade() { [523, 784, 1047, 1319].forEach((f, i) => this.tone(f, 0.3, 'triangle', 0.08, 0, i * 0.08)); },
     equip() { this.tone(620, 0.08, 'triangle', 0.07, 240); },

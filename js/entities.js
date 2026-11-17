@@ -6,7 +6,9 @@ import { DEATH_TIME, PLAYER_HP } from './config.js';
 const PALETTES = {
     1: { stone: '#7b7f86', dark: '#2d3038', deep: '#191b22', moss: '#5f8054', glow: '#7fe3ff', metal: '#8d8878', accent: '#d9c9a0' },
     2: { stone: '#5f7096', dark: '#232d48', deep: '#121830', moss: '#4f6e8f', glow: '#a8d8ff', metal: '#7e8ba8', accent: '#ffe9a8' },
-    3: { stone: '#6a4b47', dark: '#2a1a17', deep: '#160d0b', moss: '#83401f', glow: '#ff9a4a', metal: '#5b4d50', accent: '#ffd08a' }
+    3: { stone: '#6a4b47', dark: '#2a1a17', deep: '#160d0b', moss: '#83401f', glow: '#ff9a4a', metal: '#5b4d50', accent: '#ffd08a' },
+    4: { stone: '#4e3436', dark: '#221214', deep: '#120809', moss: '#6e1d14', glow: '#ff5a2a', metal: '#4a3c42', accent: '#ffb07a' },
+    5: { stone: '#a9a3bd', dark: '#5a5478', deep: '#3a3558', moss: '#d9c27e', glow: '#ffe2a0', metal: '#b9ad8c', accent: '#fff0c0' }
 };
 let chapter = 1;
 let pal = PALETTES[1];
@@ -87,7 +89,8 @@ export function makeAbilityMarker(color) {
 
 const K_LAYER = LAYER.player;
 const YAW = Math.PI * 0.36;
-const SPIN_SPEED = 26;
+const SPIN_SPEED = 34;
+const BALL_LIFT = 0.17;
 const DASH_DRAINED = new THREE.Color(0x7b8fb3);
 const DASH_FULL = new THREE.Color(0xffffff);
 const GROUNDED = new Set(['idle', 'walk', 'run', 'land']);
@@ -99,15 +102,15 @@ const POSES = {
     walk: { lean: 0.09, hip: 0.4, tF: 0, sF: 0, tB: 0, sB: 0, uF: 0, lF: 0.3, uB: 0, lB: 0.3, head: -0.05 },
     run: { lean: 0.3, hip: 0.4, tF: 0, sF: 0, tB: 0, sB: 0, uF: 0, lF: 0.9, uB: 0, lB: 0.9, head: -0.2 },
     jump: { lean: 0.1, hip: 0.4, tF: 1, sF: -1.3, tB: -0.25, sB: -0.5, uF: 1.1, lF: 0.6, uB: -0.75, lB: 0.3, head: 0.05 },
-    spin: { lean: 0, hip: 0.4, tF: 2.3, sF: -2.5, tB: 2.1, sB: -2.5, uF: 1.3, lF: 1.9, uB: 1.1, lB: 1.9, head: 0.75 },
-    fall: { lean: -0.05, hip: 0.4, tF: 0.45, sF: -0.85, tB: -0.2, sB: -0.75, uF: 2.1, lF: 0.3, uB: -1.9, lB: 0.3, head: 0.12 },
+    spin: { lean: 0, hip: 0.4, tF: 2.55, sF: -2.75, tB: 2.45, sB: -2.75, uF: 1.05, lF: 2.35, uB: 0.95, lB: 2.35, head: 1.05 },
+    fall: { lean: -0.05, hip: 0.4, tF: 0.45, sF: -0.85, tB: -0.2, sB: -0.75, uF: 1.6, lF: 0.3, uB: -1.9, lB: 0.3, head: 0.12 },
     land: { lean: 0.35, hip: 0.4, tF: 1.1, sF: -1.7, tB: 0.7, sB: -1.6, uF: -0.5, lF: 0.4, uB: 0.45, lB: 0.5, head: -0.3 },
     dash: { lean: 1.1, hip: 0.4, tF: 0.45, sF: -1.1, tB: -1.05, sB: -0.5, uF: 1.45, lF: 0.05, uB: -1.35, lB: 0.2, head: -0.85 },
     grab: { lean: -0.04, hip: 0.4, tF: 1.05, sF: -1.1, tB: 0.7, sB: -1.3, uF: 2.2, lF: -0.5, uB: 1.9, lB: -0.5, head: 0 },
     climb: { lean: -0.04, hip: 0.4, tF: 0.9, sF: -1.1, tB: 0.6, sB: -1.2, uF: 2.2, lF: -0.5, uB: 2, lB: -0.5, head: 0.08 },
     slide: { lean: -0.12, hip: 0.4, tF: 1, sF: -0.9, tB: 0.5, sB: -1, uF: 2.5, lF: -0.3, uB: -0.3, lB: 0.5, head: 0.1 },
     pound: { lean: 0.2, hip: 0.4, tF: 1.7, sF: -2.1, tB: 1.45, sB: -2.1, uF: 2.8, lF: 0.1, uB: 2.8, lB: 0.1, head: -0.4 },
-    hurt: { lean: -0.5, hip: 0.4, tF: 0.5, sF: -0.4, tB: -0.5, sB: -0.5, uF: 2, lF: 0.3, uB: -2, lB: 0.3, head: -0.45 },
+    hurt: { lean: -0.5, hip: 0.4, tF: 0.5, sF: -0.4, tB: -0.5, sB: -0.5, uF: 1.5, lF: 0.3, uB: -2, lB: 0.3, head: -0.45 },
     glide: { lean: 0.14, hip: 0.4, tF: 0.3, sF: -0.5, tB: -0.25, sB: -0.5, uF: 1.75, lF: 0.15, uB: -1.75, lB: -0.15, head: -0.1 },
     cast: { lean: 0.1, hip: 0.4, tF: 0.4, sF: -0.5, tB: -0.3, sB: -0.3, uF: 1.55, lF: 0.05, uB: -0.5, lB: 0.4, head: -0.1 },
     fallen: { lean: 0.55, hip: 0.4, tF: 1.65, sF: -2.4, tB: 1.45, sB: -2.4, uF: -0.15, lF: 0.25, uB: 0.1, lB: 0.2, head: 0.95 }
@@ -183,7 +186,7 @@ export function makePlayer(skin) {
     body.add(spin, ring);
     group.add(shadow, halo, body);
     group.userData = {
-        halo, shadow, body, spin, ring, hip, yaw, model, hipY,
+        halo, shadow, body, spin, inner, ring, hip, yaw, model, hipY, center,
         turn: 1, phase: 0, cur: { ...POSES.idle }, tailA: 0, tailV: 0,
         ball: 0, spinAngle: 0, footFix: 0, wound: 0, flash: 0, lastHp: null, appear: 0, wasDead: false,
         ghosts: [], ghostT: 0, ghostI: 0, threads: [], threadT: 0
@@ -307,6 +310,8 @@ function animateDeath(group, p, dt, t, facing) {
     u.spinAngle = 0;
     u.spin.rotation.z = 0;
     u.spin.scale.setScalar(1);
+    u.spin.position.y = u.center;
+    u.inner.position.y = -u.center;
     u.ring.visible = false;
     u.body.scale.set(1, 1, 1);
     u.footFix = damp(u.footFix, 0, Math.min(1, dt * 8));
@@ -411,7 +416,12 @@ export function animatePlayer(group, p, pose, dt, t) {
         if (u.spinAngle >= goal - 1e-4) u.spinAngle = 0;
     }
     u.spin.rotation.z = -u.spinAngle * facing;
-    u.spin.scale.setScalar(1 - 0.18 * u.ball);
+    u.spin.scale.setScalar(1 - 0.34 * u.ball);
+    // encolhido, o centro de massa sobe: o pivô acompanha para a bola girar no próprio eixo
+    const pivot = u.center + BALL_LIFT * u.ball;
+    u.spin.position.y = pivot;
+    u.inner.position.y = -pivot;
+    u.ring.position.y = pivot;
     u.ring.visible = u.ball > 0.05;
     u.ring.material.opacity = u.ball * (balling ? 0.6 : 0.3);
     u.ring.rotation.z -= dt * 34 * facing;
@@ -539,8 +549,8 @@ export function makeSpikes(ceiling = false) {
         for (let i = 0; i < 4; i++) {
             const x = -0.4 + i * 0.27;
             const h = 0.46 + (i % 2) * 0.16;
-            shape(ctx, [[x - 0.12, -0.3, 1], [x + 0.015, -0.3 + h, 1], [x + 0.13, -0.3, 1]], chapter === 3 ? '#3c2a29' : '#cfd3d8', 0.024);
-            stroke(ctx, [[x + 0.03, -0.26], [x + 0.015, -0.3 + h * 0.8]], 0.016, chapter === 3 ? '#ff8a4a' : '#ffffff');
+            shape(ctx, [[x - 0.12, -0.3, 1], [x + 0.015, -0.3 + h, 1], [x + 0.13, -0.3, 1]], chapter === 5 ? '#e8c878' : chapter >= 3 ? '#3c2a29' : '#cfd3d8', 0.024);
+            stroke(ctx, [[x + 0.03, -0.26], [x + 0.015, -0.3 + h * 0.8]], 0.016, chapter === 5 ? '#fff6dc' : chapter >= 3 ? '#ff8a4a' : '#ffffff');
         }
     }, { ppu: 110, layer: LAYER.dress + 1, x: 0.5, y: ceiling ? 0.68 : 0.32 });
     if (ceiling) spikes.rotation.z = Math.PI;
@@ -611,6 +621,78 @@ export function makeGoal() {
 export function animateGoal(m, t) {
     m.userData.swirl.rotation.z = -t * 1.6;
     m.userData.swirl.scale.setScalar(1 + Math.sin(t * 3) * 0.06);
+}
+
+// Passagem entre salas do mundo aberto: arco de pedra com um túnel escuro e uma laje que
+// fecha a abertura enquanto a passagem estiver trancada (chefe vivo, movimento faltando etc.).
+const ARCH_OUTER = [[-1.1, 0.0, 1], [-1.15, 1.2], [-0.8, 2.3], [0, 2.75], [0.8, 2.3], [1.15, 1.2], [1.1, 0.0, 1], [0.72, 0.0, 1], [0.75, 1.15], [0.5, 1.95], [0, 2.25], [-0.5, 1.95], [-0.75, 1.15], [-0.72, 0, 1]];
+const ARCH_INNER = [[-0.74, 0, 1], [-0.76, 1.15], [-0.51, 1.96], [0, 2.27], [0.51, 1.96], [0.76, 1.15], [0.74, 0, 1]];
+const OPENING = 2.27;
+export function makePassage() {
+    const g = new THREE.Group();
+    const tunnel = sprite(K('passTunnel'), 1.6, 2.4, ctx => {
+        shape(ctx, ARCH_INNER, pal.deep, 0);
+        clipTo(ctx, ARCH_INNER, () => {
+            ctx.fillStyle = vGrad(ctx, 0, 2.3, rgba(pal.glow, 0.32), rgba(pal.glow, 0));
+            ctx.fillRect(-0.8, 0, 1.6, 2.3);
+            radial(ctx, 0, 0.7, 0.75, pal.glow, 0.28);
+        });
+    }, { ay: 0, ppu: 100, layer: LAYER.back });
+    const slab = sprite(K('passSlab'), 1.6, OPENING, ctx => {
+        const top = 0;
+        const bottom = -OPENING;
+        clipTo(ctx, ARCH_INNER.map(([x, y, c]) => [x, y - OPENING, c]), () => {
+            ctx.fillStyle = vGrad(ctx, top, bottom, mixHex(pal.stone, '#ffffff', 0.08), mixHex(pal.stone, '#000000', 0.25));
+            ctx.fillRect(-0.8, bottom, 1.6, OPENING);
+            for (let y = bottom + 0.55; y < top; y += 0.55) stroke(ctx, [[-0.8, y], [0.8, y]], 0.022, INK);
+            stroke(ctx, [[0, bottom + 0.55], [0, bottom + 1.1]], 0.02, INK);
+            stroke(ctx, [[-0.35, bottom + 1.1], [-0.35, bottom + 1.65]], 0.02, INK);
+            stroke(ctx, [[0.35, bottom + 1.1], [0.35, bottom + 1.65]], 0.02, INK);
+        });
+        ctx.save();
+        ctx.translate(0, bottom + 1.25);
+        ctx.fillStyle = pal.glow;
+        ctx.beginPath();
+        ctx.moveTo(0, 0.2);
+        ctx.lineTo(0.15, 0);
+        ctx.lineTo(0, -0.2);
+        ctx.lineTo(-0.15, 0);
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+    }, { ay: 1, ppu: 100, layer: LAYER.back + 1 });
+    slab.position.y = OPENING;
+    const arch = sprite(K('passArch'), 2.8, 3.1, ctx => {
+        shape(ctx, ARCH_OUTER, pal.stone, 0.04);
+        for (const [x, y, r] of [[-0.92, 1.05, 0], [-0.74, 1.85, 0.7], [0, 2.45, 0], [0.74, 1.85, -0.7], [0.92, 1.05, 0]]) {
+            ctx.save();
+            ctx.translate(x, y);
+            ctx.rotate(r);
+            ctx.fillStyle = mixHex(pal.stone, '#000000', 0.35);
+            ctx.fillRect(-0.05, -0.1, 0.1, 0.2);
+            ctx.restore();
+        }
+        stroke(ctx, [[-1, 0.5], [-0.8, 0.45]], 0.02, INK);
+        stroke(ctx, [[0.8, 1.4], [1.05, 1.5]], 0.02, INK);
+    }, { ay: 0, ppu: 100, layer: LAYER.back + 2 });
+    const glow = glowSprite(parseInt(pal.glow.slice(1), 16), 2.4, { opacity: 0.3, layer: LAYER.back });
+    glow.position.y = 1.0;
+    g.add(glow, tunnel, slab, arch);
+    g.userData = { slab, glow, lift: 0 };
+    return g;
+}
+
+// lift: 0 = laje fechada, 1 = totalmente aberta.
+export function setPassageLift(m, lift) {
+    const k = Math.max(0, Math.min(1, lift));
+    m.userData.lift = k;
+    m.userData.slab.visible = k < 0.999;
+    m.userData.slab.scale.y = Math.max(0.001, 1 - k);
+    m.userData.glow.visible = k > 0.5;
+}
+
+export function animatePassage(m, t) {
+    if (m.userData.glow.visible) m.userData.glow.material.opacity = 0.24 + Math.sin(t * 2.2) * 0.06;
 }
 
 export function makeCrumble() {

@@ -581,17 +581,18 @@ const LOADOUTS = {
     ofensiva: { shockwave: 3, light_lance: 3, riposte: 3 },
     defensiva: { energy_shield: 3, regeneration: 3, heal: 3 },
     mobilidade: { long_dash: 3, air_burst: 3, glide: 3 },
-    especial: { time_dilation: 3, summit_form: 3, perfect_dodge: 3 },
+    especial: { time_dilation: 3, recall: 3, perfect_dodge: 3 },
     suporte: { steadfast: 3, crystal_link: 3, blade_dash: 3 }
 };
 
-for (const [index, name] of [[STORM, 'Olho'], [CORE, 'Guardião']]) {
+const THRONE = 17;
+for (const [index, name, ach] of [[STORM, 'Olho', 'boss2'], [CORE, 'Guardião', 'boss3'], [THRONE, 'Arauto', 'herald']]) {
     for (const [label, abilities] of Object.entries(LOADOUTS)) {
         test(`vencível com entrada real: ${name} com loadout ${label}`, () => {
             const { stats } = playBoss(index, { abilities, limit: 900 });
             assert.ok(stats.won, JSON.stringify(stats));
             assert.ok(stats.windows >= 6);
-            assert.equal(Save.data.achievements[index === STORM ? 'boss2' : 'boss3'], true);
+            assert.equal(Save.data.achievements[ach], true);
         });
     }
 }

@@ -4,6 +4,7 @@ import { Sfx } from './audio.js';
 import { INK, LAYER, glowSprite, hatch, mixHex, pivot, radial, rgba, rng, shape, sprite, stroke, trace, vGrad } from './ink.js';
 import { addLayer, crystalCluster, layerTexture } from './backdrops.js';
 import { makeDecor, makeFlower, makeRubble } from './decor.js';
+import { makeChain } from './infernoArt.js';
 
 const AETHER = 0x6fcfff;
 const FADE = 0.7;
@@ -430,6 +431,122 @@ const SETS = {
         data.hero = hero;
         return data;
     },
+    // Passagem para o Inferno: o chão do Núcleo se parte e Kael cai pela rocha até os Portões.
+    rift(g) {
+        const data = { sky: ['#0a0406', '#7a1f0c'], embers: [] };
+        plate(g, 80, 130, -18, ctx => {
+            ctx.fillStyle = vGrad(ctx, 130, 0, '#0a0608', '#b03410');
+            ctx.fillRect(0, 0, 80, 130);
+        }, { x: -40, y: -100, order: LAYER.mid });
+        const crack = glowSprite(0xff5a20, 1, { opacity: 0.3, layer: LAYER.terrain - 1, x: 0, y: -3 });
+        crack.position.z = -3;
+        g.add(crack);
+        const slab = side => {
+            const part = new THREE.Group();
+            solid(part, '#14101a', side < 0 ? -50 : 0, -6, -2, 50, 6, LAYER.terrain);
+            plate(part, 50, 1.2, -1.9, ctx => {
+                const r = rng(side + 40);
+                ctx.fillStyle = '#2a2336';
+                ctx.fillRect(0, 0.7, 50, 0.5);
+                for (let i = 0; i < 12; i++) stroke(ctx, [[side < 0 ? 50 - i * 0.7 : i * 0.7, 1.2], [r() * 50, r() * 0.8]], 0.05, '#ff6a2a');
+            }, { x: side < 0 ? -50 : 0, y: -1.1, order: LAYER.terrain + 1 });
+            g.add(part);
+            return part;
+        };
+        data.slabs = [slab(-1), slab(1)];
+        for (const side of [-1, 1]) {
+            plate(g, 16, 78, -1, ctx => {
+                const r = rng(side + 90);
+                ctx.fillStyle = '#1d1419';
+                ctx.fillRect(0, 0, 16, 78);
+                for (let i = 0; i < 26; i++) {
+                    const x = 2 + r() * 12;
+                    const y = r() * 74;
+                    stroke(ctx, [[x, y], [x + r() - 0.5, y + 2], [x + r() - 0.5, y + 4]], 0.14, '#ff6a2a');
+                }
+            }, { x: side < 0 ? -22 : 6, y: -84, order: LAYER.terrain + 2 });
+        }
+        plate(g, 44, 26, -6, ctx => {
+            ctx.fillStyle = '#1a0a0c';
+            for (const x of [6, 32]) ctx.fillRect(x, 0, 6, 22);
+            ctx.fillRect(6, 19, 32, 4);
+            for (let x = 14; x <= 30; x += 3) ctx.fillRect(x, 8, 0.8, 11);
+            stroke(ctx, [[10, 21], [34, 21]], 0.3, '#ff7a3c');
+        }, { x: -22, y: -92, order: LAYER.terrain + 1 });
+        solid(g, '#120a0c', -30, -98, -0.5, 60, 6, LAYER.terrain + 3);
+        for (let i = 0; i < 26; i++) {
+            const m = glowSprite(0xffa050, 0.5, { opacity: 0.8, layer: LAYER.fx, x: (i * 37 % 26) - 13, y: 0 });
+            m.userData.phase = i * 3.7;
+            g.add(m);
+            data.embers.push(m);
+        }
+        const hero = kael('idle');
+        g.add(hero.model);
+        data.hero = hero;
+        return data;
+    },
+    // Passagem para o Céu: as correntes se partem e um feixe leva Kael pelas cinzas e pelas nuvens.
+    ascent(g) {
+        const data = { sky: ['#3d57a6', '#120406'], chains: [], embers: [] };
+        plate(g, 90, 170, -18, ctx => {
+            const grad = ctx.createLinearGradient(0, 0, 0, 170);
+            grad.addColorStop(0, '#190606');
+            grad.addColorStop(0.3, '#3a241f');
+            grad.addColorStop(0.55, '#8a86a6');
+            grad.addColorStop(0.72, '#ffd9a8');
+            grad.addColorStop(1, '#6d8fd8');
+            ctx.fillStyle = grad;
+            ctx.fillRect(0, 0, 90, 170);
+        }, { x: -45, y: -20, order: LAYER.mid });
+        solid(g, '#160808', -60, -8, -1, 120, 8, LAYER.terrain);
+        for (const x of [-11, -7, 6, 10]) {
+            const c = makeChain(26);
+            c.position.set(x, 30, -2);
+            c.userData.y0 = 30;
+            g.add(c);
+            data.chains.push(c);
+        }
+        const puffs = (y, color, seed, order, z) => plate(g, 90, 16, z, ctx => {
+            const r = rng(seed);
+            ctx.fillStyle = color;
+            for (let i = 0; i < 40; i++) {
+                ctx.beginPath();
+                ctx.arc(r() * 90, 8 + (r() - 0.5) * 7, 2.5 + r() * 3.5, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }, { x: -45, y, order });
+        puffs(44, '#3a2e30', 11, LAYER.terrain + 1, -4);
+        puffs(50, '#2c2326', 12, LAYER.terrain + 3, 1);
+        puffs(92, '#efe2d2', 13, LAYER.terrain + 1, -4);
+        puffs(98, '#fff6e6', 14, LAYER.terrain + 3, 1);
+        solid(g, '#fff6e6', -60, 116, -1, 120, 6, LAYER.terrain + 2);
+        plate(g, 60, 8, -1.5, ctx => {
+            const r = rng(21);
+            ctx.fillStyle = '#fff6e6';
+            for (let i = 0; i < 30; i++) {
+                ctx.beginPath();
+                ctx.arc(r() * 60, 1.5 + r() * 1.5, 1 + r() * 1.5, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }, { x: -30, y: 121, order: LAYER.terrain + 3 });
+        data.sun = glowSprite(0xfff0c0, 30, { opacity: 0.85, layer: LAYER.terrain - 1, x: 0, y: 140 });
+        data.sun.position.z = -12;
+        g.add(data.sun);
+        data.beam = glowSprite(0xffeec0, 1, { opacity: 0, layer: LAYER.terrain + 2, x: 0, y: 55 });
+        data.beam.position.z = -0.5;
+        data.beam.scale.set(7, 170, 1);
+        g.add(data.beam);
+        for (let i = 0; i < 18; i++) {
+            const m = glowSprite(0xffe2a0, 0.45, { opacity: 0.7, layer: LAYER.fx, x: (i * 31 % 22) - 11, y: 0 });
+            m.userData.phase = i * 4.1;
+            g.add(m);
+            data.embers.push(m);
+        }
+        const hero = kael('idle');
+        g.add(hero.model);
+        data.hero = hero;
+        return data;
+    },
     chamber(g) {
         const data = { sky: ['#02050d', '#05152d'], crystals: [], motes: [] };
         solid(g, '#090d18', -130, -60, -3, 260, 60, LAYER.terrain - 1);
@@ -505,7 +622,7 @@ export const SCENES = {
             { set: 'city', dur: 8, cam: [[-16, 11, 40], [14, 14, 36]], look: [[-10, 11, -10], [8, 13, -10]], lines: [[0.5, 'Uma cidade cresceu em suas encostas.'], [4, 'Colheram os cristais. Deram nomes às tempestades.']], cityLit: 1 },
             { set: 'city', dur: 7, cam: [[14, 14, 36], [15, 11, 44]], look: [[8, 13, -10], [6, 10, -10]], lines: [[1.9, 'Até o dia em que, sem aviso, o Éter parou de fluir.']], cityLit: 0, stonesFall: true, sfx: 'shatter' },
             { set: 'camp', dur: 7, cam: [[-12, 8, 32], [5, 5, 24]], look: [[-8, 7, -8], [1, 4, -6]], lines: [[0.5, 'Os sobreviventes desceram e juraram que alguém subiria de novo.'], [4, 'Gerações se passaram. A montanha permaneceu.']] },
-            { set: 'training', dur: 6, cam: [[1, 3, 9], [1.5, 7.6, 7.4]], look: [[2.5, 3.2, 0], [3.1, 8, 0]], lines: [[0.8, 'Kael nunca esperou.'], [3.2, 'Ele treinou.']], climb: 1.3 },
+            { set: 'training', dur: 6, cam: [[1, 3, 9], [1.5, 7.6, 7.4]], look: [[2.5, 3.2, 0], [3.1, 8, 0]], lines: [[0.8, 'Kael nunca esperou.'], [3, 'Treinou com Oren, o velho guarda, até cada salto virar instinto.']], climb: 1.3 },
             { set: 'camp', dur: 6.5, cam: [[3.6, 2.6, 10], [2.2, 2.2, 7.2]], look: [[1.6, 2.2, 0], [1.4, 1.9, 0]], lines: [[1.6, 'Na última noite, o cristal adormecido acendeu.']], relic: [0, 1], heroFacing: -1, sfx: 'relic' },
             { set: 'ascent', dur: 6.5, cam: [[-7, 4.4, 15], [-1, 5.6, 14]], look: [[-3, 4.4, 0], [2, 7.2, 0]], lines: [[1, 'Ele partiu na madrugada. Sozinho. Sem avisar ninguém.']], walk: 2 }
         ]
@@ -535,6 +652,36 @@ export const SCENES = {
             { set: 'camp', dur: 6, cam: [[2.2, 2.2, 7.2], [3, 6, 20]], look: [[1.4, 1.9, 0], [1, 7, -10]], lines: [], relic: [1.4, 3.6], noHero: true, sfx: 'relic' },
             { set: 'chamber', dur: 9, cam: [[2.4, 1.6, 8], [1.6, 1.6, 6.4]], look: [[0, 1.2, 0], [0, 1.4, 0]], heroAt: 0, sit: true, lines: [[1.2, 'Ele não sabe se conseguirá descer.'], [5, 'Mas, por um momento, apenas fica ali.']], chamberLit: 1, motes: true, fadeMusic: 8 },
             { set: 'dawn', dur: 8, cam: [[0, 10, 84], [0, 20, 66]], look: [[0, 20, -20], [0, 28, -20]], lines: [[3, 'A montanha, pela primeira vez em séculos, está em silêncio.']] }
+        ]
+    },
+    // Ponte para o Inferno: o Núcleo era uma porta com dois lados. Calá-lo abriu o de baixo.
+    ch3to4: {
+        music: 4,
+        shots: [
+            { set: 'chamber', dur: 6.5, cam: [[2.4, 1.6, 8], [0.8, 1.4, 6]], look: [[0, 1.2, 0], [0, 1.1, 0]], heroAt: 0, sit: true, lines: [[0.8, 'O silêncio durou uma noite.'], [3.6, 'Então o chão do Núcleo começou a esquentar.']], chamberLit: [1, 0.4], sfx: 'crack' },
+            { set: 'rift', dur: 5.5, cam: [[0, 3, 15], [0, 2, 11]], look: [[0, 0.5, 0], [0, -1, 0]], heroAt: 0, heroY: 0, rift: [0, 0.35], shake: 0.08, lines: [[0.8, 'O Núcleo não guardava só a montanha. Guardava a porta de baixo.']], sfx: 'crack' },
+            { set: 'rift', dur: 6, cam: [[0, 1, 13], [0, -38, 22]], look: [[0, -1, 0], [0, -42, 0]], heroAt: 0, path: [0, -44], rift: [0.35, 1], shake: 0.14, lines: [[0.8, 'O chão se abriu sob os pés de Kael.'], [3.4, 'E a porta de baixo sempre teve alguém esperando.']], sfx: 'shatter' },
+            { set: 'rift', dur: 6.5, cam: [[0, -48, 20], [0, -84, 24]], look: [[0, -52, 0], [0, -84, -4]], heroAt: 0, path: [-44, -92], rift: [1, 1], lines: [[0.8, 'Os antigos chamavam aquele lugar de Fundo.'], [3.6, 'Kael só conhecia outra palavra para ele: Inferno.']], sfx: 'gust' }
+        ]
+    },
+    // Ponte para o Céu: vencer o Fundo soltou as correntes que seguravam a porta de cima.
+    ch4to5: {
+        music: 5,
+        shots: [
+            { set: 'ascent', dur: 6, cam: [[0, 3, 15], [0, 8, 22]], look: [[0, 1, 0], [0, 12, 0]], heroAt: 0, heroY: 0, breakChains: true, lines: [[0.8, 'Oren caiu sem dizer mais nada.'], [3.4, 'E todas as correntes do Fundo se soltaram de uma vez.']], sfx: 'shatter' },
+            { set: 'ascent', dur: 7, cam: [[0, 4, 16], [0, 48, 20]], look: [[0, 3, 0], [0, 52, 0]], heroAt: 0, path: [0, 50], pose: 'jump', beam: true, lines: [[0.8, 'Uma luz desceu pelo mesmo buraco por onde ele tinha caído.'], [3.8, 'Não era um convite. Era uma convocação.']], sfx: 'relic' },
+            { set: 'ascent', dur: 6.5, cam: [[0, 54, 18], [0, 104, 22]], look: [[0, 58, 0], [0, 110, 0]], heroAt: 0, path: [50, 112], pose: 'jump', beam: true, lines: [[0.8, 'Atravessou as cinzas. Depois, as nuvens.']], sfx: 'gust' },
+            { set: 'ascent', dur: 6.5, cam: [[0, 118, 12], [0, 126, 24]], look: [[0, 124, 0], [0, 132, -6]], heroAt: 0, heroY: 122, lines: [[0.8, 'Acima de tudo, o Alto.'], [3.4, 'E o Alto já sabia o nome dele.']], fadeMusic: 7 }
+        ]
+    },
+    // Final do jogo: não há ninguém no trono. Kael desce para casa por vontade própria.
+    ending: {
+        music: 'cine_final',
+        shots: [
+            { set: 'ascent', dur: 7, cam: [[0, 124, 10], [0, 126, 16]], look: [[0, 123, 0], [0, 128, -4]], heroAt: 0, heroY: 122, lines: [[0.8, 'A máscara do Arauto se partiu.'], [3.6, 'Dentro dela não havia rosto. Só uma ordem esperando quem a desse.']] },
+            { set: 'ascent', dur: 7, cam: [[0, 126, 24], [0, 136, 42]], look: [[0, 130, 0], [0, 140, -10]], heroAt: 0, heroY: 122, lines: [[0.8, 'Ninguém mandou Varak ficar. Ninguém mandou Aethos olhar.'], [4, 'Ninguém mandou Kael subir.']] },
+            { set: 'camp', dur: 8, cam: [[2.2, 2.2, 7.2], [3, 5, 18]], look: [[1.4, 1.9, 0], [1, 6, -10]], relic: [1.4, 3.6], lines: [[1, 'Ele desceu sem ser chamado.'], [4.6, 'E, pela primeira vez, a escolha de voltar foi só dele.']], sfx: 'relic' },
+            { set: 'dawn', dur: 8, cam: [[0, 10, 84], [0, 24, 62]], look: [[0, 20, -20], [0, 32, -20]], lines: [[3, 'A montanha, o Fundo e o Alto continuam lá. Agora todos têm caminho de volta.']], fadeMusic: 7 }
         ]
     }
 };
@@ -606,7 +753,7 @@ export class Cinema {
         if (shot.sfx && Sfx[shot.sfx]) Sfx[shot.sfx]();
         if (shot.fadeMusic) Sfx.fadeMusic(shot.fadeMusic);
         if (set.data.hero) {
-            set.data.hero.state.y = shot.fall ? 40 : set.data.hero.state.y;
+            set.data.hero.state.y = shot.fall ? 40 : shot.heroY ?? set.data.hero.state.y;
             set.data.hero.model.visible = !shot.noHero;
             if (shot.heroAt !== undefined) {
                 set.data.hero.state.x = shot.heroAt;
@@ -656,6 +803,10 @@ export class Cinema {
         const [l1, l2] = shot.look;
         this.camera.position.set(mix(c1[0], c2[0], k), mix(c1[1], c2[1], k), mix(c1[2], c2[2], k));
         this.camera.lookAt(mix(l1[0], l2[0], k), mix(l1[1], l2[1], k), mix(l1[2], l2[2], k));
+        if (shot.shake) {
+            this.camera.position.x += Math.sin(this.time * 47) * shot.shake;
+            this.camera.position.y += Math.sin(this.time * 61) * shot.shake;
+        }
         for (let i = a.line + 1; i < shot.lines.length; i++) {
             if (a.t < shot.lines[i][0]) break;
             a.line = i;
@@ -713,6 +864,22 @@ export class Cinema {
                 m.position.y = m.userData.y0 + ((this.time * 0.5 + m.userData.phase) % 6);
             });
         }
+        if (data.slabs) {
+            const open = shot.rift ? mix(shot.rift[0], shot.rift[1], smooth(k)) : 1;
+            data.slabs[0].position.x = -open * 8;
+            data.slabs[1].position.x = open * 8;
+        }
+        if (data.embers) {
+            const cy = this.camera.position.y;
+            data.embers.forEach(m => { m.position.y = cy - 16 + ((this.time * 7 + m.userData.phase) % 32); });
+        }
+        if (data.chains) {
+            data.chains.forEach((c, i) => {
+                const drop = shot.breakChains ? Math.max(0, k - 0.25 - i * 0.05) : shot.path || shot.heroY > 0 ? 2 : 0;
+                c.position.y = c.userData.y0 - drop * drop * 70;
+            });
+        }
+        if (data.beam) data.beam.material.opacity = shot.beam ? 0.65 + Math.sin(this.time * 5) * 0.1 : 0;
         if (data.hero) this.animateHero(shot, data.hero, k, dt);
     }
 
@@ -736,11 +903,14 @@ export class Cinema {
         } else if (shot.fall) {
             s.y = mix(40, -46, smooth(k));
             pose = 'fall';
+        } else if (shot.path) {
+            s.y = mix(shot.path[0], shot.path[1], smooth(k));
+            pose = shot.pose || 'fall';
         } else if (shot.sit) {
             pose = 'land';
         }
         if (shot.heroFacing) s.facing = shot.heroFacing;
-        s.onGround = pose !== 'fall';
+        s.onGround = pose !== 'fall' && pose !== 'jump';
         E.animatePlayer(hero.model, s, pose, dt, this.time);
     }
 

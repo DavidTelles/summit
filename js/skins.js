@@ -35,3 +35,15 @@ export function skinById(id) {
 export function skinForChapter(chapter) {
     return SKINS.find(s => s.chapter === chapter) || null;
 }
+
+// Visuais de personagens que usam o mesmo rig do protagonista. Não são escolhíveis nem entram no save.
+const LOOKS = [
+    {
+        id: 'oren', name: 'Oren', fur: 0x2a2226, pads: 0xff4a2a, padGlow: 0xb0200a, blush: 0x8a1a10, eyes: 0xffd060,
+        marks: { type: 2, color: 0xff5020, glow: 2.2 }, scarf: 0x5a1010
+    }
+];
+
+export function lookById(id) {
+    return skinById(id) || LOOKS.find(s => s.id === id) || null;
+}

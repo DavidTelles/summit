@@ -121,13 +121,31 @@ check('Esc pula a cena e abre a central', await evaluate(`__summit.state === 'hu
 check('novo jogo entra na central do save', await evaluate(`__summit.screen === 'hub' && ${visible('hub')}`));
 check('personagem 3D renderizado na central', await evaluate(`(() => { const c = document.getElementById('hero'); return c.offsetWidth > 100 && c.closest('#hero-slot') !== null; })()`));
 await shot('04-central');
-await evaluate(`document.getElementById('btn-continue').click()`);
+
+// skins: duplo clique no protagonista abre a tela; bloqueadas aparecem mas não equipam
+await evaluate(`document.getElementById('hero').dispatchEvent(new MouseEvent('dblclick', { bubbles: true }))`);
 await wait(300);
-check('continuar abre a preparação', await evaluate(visible('prep')));
-await shot('04b-preparacao-inicio');
-await evaluate(`document.getElementById('btn-prep-start').click()`);
+check('duplo clique no protagonista abre as skins', await evaluate(`__summit.screen === 'skins' && ${visible('skins')} && document.getElementById('hero').closest('#skins-stage') !== null`));
+check('skins bloqueadas aparecem com cadeado', await evaluate(`(() => {
+    const chips = [...document.querySelectorAll('#skins-grid .skin-chip')];
+    return chips.length === 4 && chips.filter(c => c.classList.contains('locked') && c.getAttribute('aria-disabled') === 'true').length === 3;
+})()`));
+await shot('04a-skins');
+await evaluate(`document.querySelector('#skins-grid .skin-chip[data-arg=geada]').click()`);
+await wait(150);
+check('skin bloqueada não equipa', await evaluate(`__summit.Save.data.skins.equipped === 'original'`));
+await evaluate(`__summit.Save.data.skins.unlocked.push('geada'); __summit.actions.skins()`);
+await wait(150);
+await evaluate(`document.querySelector('#skins-grid .skin-chip[data-arg=geada]').click()`);
+await wait(150);
+check('skin desbloqueada equipa', await evaluate(`__summit.Save.data.skins.equipped === 'geada' && document.querySelector('#skins-grid .skin-chip[data-arg=geada]').classList.contains('equipped')`));
+await evaluate(`document.querySelector('#skins [data-act=back]').click()`);
+await wait(300);
+check('voltar das skins devolve o protagonista à central', await evaluate(`__summit.screen === 'hub' && document.getElementById('hero').closest('#hero-slot') !== null`));
+await evaluate(`__summit.Save.data.skins.equipped = 'original'; __summit.Save.data.skins.unlocked = ['original']; __summit.hub.setTab('home')`);
+await evaluate(`document.getElementById('btn-continue').click()`);
 await wait(1500);
-check('jogo iniciado', await evaluate(`__summit.state === 'playing' && ${visible('hud')}`));
+check('continuar entra direto no jogo (sem preparação)', await evaluate(`__summit.state === 'playing' && ${visible('hud')}`));
 check('HUD mostra a habilidade equipada', await evaluate(`document.querySelectorAll('#hud-abilities .hud-ab').length === 1 && ${visible('hud-abilities')}`));
 await shot('04c-fase1');
 
@@ -142,14 +160,46 @@ await shot('05-pulo');
 
 await key('Escape');
 await wait(200);
-check('pausa abre', await evaluate(visible('pause')));
-await shot('06-pausa');
-await key('ArrowDown');
-const focused = await evaluate(`document.activeElement.textContent`);
-check('navegação por teclado no menu', focused === 'Reiniciar fase', focused);
+check('inventário abre com Esc', await evaluate(visible('pause') && `__summit.state === 'paused'`));
+check('inventário começa nas habilidades', await evaluate(`!!document.querySelector('#inv-grid .ab-card') && document.querySelectorAll('#inv-panel .slot').length === 3`));
+await shot('06-inventario-habilidades');
+// troca de habilidade em jogo: tira a equipada e coloca outra, sem sair da fase
+await evaluate(`(() => { const d = __summit.Save.data; d.abilities.energy_shield = 1; __summit.actions['inv-tab']({ dataset: { arg: 'abilities' } }); })()`);
+await wait(150);
+await evaluate(`document.querySelector('#inv-grid .ab-card[data-arg=energy_shield]').click()`);
+await wait(150);
+check('equipar no inventário vale na hora', await evaluate(`__summit.game.abilities.byId.has('energy_shield') && __summit.Save.data.loadout.includes('energy_shield')`));
+await key('KeyE');
+await wait(150);
+check('E troca para a aba do mapa', await evaluate(`!!document.querySelector('#inv-panel .map-canvas')`));
+await shot('06b-inventario-mapa');
+await key('KeyE');
+await wait(150);
+check('aba de som mostra só os volumes', await evaluate(`(() => { const s = document.querySelector('#inv-settings .set-group[data-section=audio]'); const c = document.querySelector('#inv-settings .set-group[data-section=controls]'); return !!s && s.offsetParent !== null && c.offsetParent === null; })()`));
+await evaluate(`(() => { const v = document.getElementById('vol-music'); v.value = 0.3; v.dispatchEvent(new Event('input')); })()`);
+check('volume muda pelo inventário', await evaluate(`__summit.Settings.music === 0.3`));
+await shot('06c-inventario-som');
 await key('Escape');
 await wait(150);
 check('Esc retoma', await evaluate(`__summit.state === 'playing'`));
+await key('KeyI');
+await wait(150);
+check('I abre o inventário', await evaluate(`__summit.state === 'paused'`));
+await key('KeyI');
+await wait(150);
+check('I fecha o inventário', await evaluate(`__summit.state === 'playing'`));
+
+// passagem: a saída da fase leva à próxima sala sem tela de resultado
+await evaluate(`(() => { const G = __summit.game; G.player.x = G.goal.x; G.player.y = G.goal.y + 0.1; })()`);
+check('passagem leva à próxima sala', await (async () => {
+    const end = Date.now() + 5000;
+    while (Date.now() < end) {
+        if (await evaluate(`__summit.state === 'playing' && __summit.game.levelIndex === 1`)) return true;
+        await wait(150);
+    }
+    return false;
+})());
+await shot('06d-chegada-cidade');
 
 const frameTimes = async ms => evaluate(`new Promise(res => { let n = 0; const t0 = performance.now(); const f = () => { n++; if (performance.now() - t0 < ${ms}) requestAnimationFrame(f); else res(n / ((performance.now() - t0) / 1000)); }; requestAnimationFrame(f); })`);
 
@@ -254,14 +304,14 @@ for (const [level, label, times] of [[4, '72-fim-varak', [2500, 3000, 3200]], [8
     check(`${label}: controle volta ao jogador`, await until(`__summit.game.aftermath.done && !__summit.game.cutscene`, 60000));
 }
 
-await evaluate(`(() => { const G = __summit.game; const d = __summit.Save.data; delete G.hurtPlayer; delete G.kill; delete d.story.scenes.final; delete d.best[11]; G.load(11); G.boss.mode = 'dead'; G.complete(); })()`);
-await wait(1600);
+await evaluate(`(() => { const G = __summit.game; const d = __summit.Save.data; delete G.hurtPlayer; delete G.kill; delete d.story.scenes.final; d.story.scenes.ch3to4 = true; delete d.best[11]; G.load(11); G.boss.mode = 'dead'; G.complete(); })()`);
+await until(`__summit.state === 'cinema'`, 6000);
 check('concluir a última fase abre o final', await evaluate(`__summit.state === 'cinema' && __summit.cinema.active.id === 'final'`));
 await key('Escape');
-await wait(500);
-check('final leva à tela de conclusão', await evaluate(`__summit.screen === 'complete' && document.getElementById('complete-title').textContent === 'A montanha em silêncio'`));
+await until(`__summit.state === 'playing'`, 6000);
+check('final segue direto para o Inferno', await evaluate(`__summit.state === 'playing' && __summit.game.levelIndex === 12`));
 check('final conta conquista e fica salvo', await evaluate(`__summit.Save.data.story.scenes.final === true && __summit.Save.data.achievements.core_reached === true`));
-await shot('75-conclusao');
+await shot('75-chegada-inferno');
 await evaluate(`__summit.actions['to-hub']()`);
 await wait(400);
 await evaluate(`__summit.hub.setTab('records')`);
@@ -320,7 +370,7 @@ await evaluate(`(() => {
     Object.assign(d.story.scenes, { intro: true, ch1to2: true, ch2to3: true, final: true });
     for (let i = 0; i < 6; i++) d.best[i] = { time: 42 + i * 11, berries: 4 };
     d.secrets['5:valley'] = true;
-    Object.assign(d.achievements, { boss1: true, no_death: true, first_steps: true, stomp_5: true, berry_5: true, crystal_10: true, ch1_complete: true });
+    Object.assign(d.achievements, { boss1: true, first_steps: true, chapter_done: true });
     d.skills = ['dash', 'wall_climb', 'double_jump', 'air_dash'];
     __summit.Save.refreshAbilities();
     d.loadout = ['shockwave', 'energy_shield'];
@@ -330,7 +380,7 @@ await evaluate(`(() => {
 await wait(600);
 await shot('26-central-avancada');
 
-const tabs = ['chapters', 'abilities', 'achievements', 'stats', 'settings'];
+const tabs = ['map', 'abilities', 'achievements', 'stats', 'settings'];
 for (const [i, tab] of tabs.entries()) {
     await click(`#hub-nav [data-arg=${tab}]`);
     await wait(350);
@@ -338,26 +388,17 @@ for (const [i, tab] of tabs.entries()) {
     await shot(`${27 + i}-aba-${tab}`);
 }
 
-await click('#hub-nav [data-arg=chapters]');
-await wait(200);
-check('capítulo mostra as fases dele', (await count('.level-tile')) === 4);
-await click('.chapter-tab.ch-3');
-await wait(150);
-check('capítulo bloqueado não abre', await evaluate(`!document.querySelector('.chapter-tab.ch-3').classList.contains('selected')`));
-await click('.chapter-tab.ch-1');
-await wait(150);
-check('capítulo 1 lista 5 fases', (await count('.level-tile')) === 5);
-await click('.chapter-tab.ch-2');
-await wait(150);
-await click('.level-tile.locked');
-await wait(150);
-check('fase bloqueada não abre preparação', await evaluate(`__summit.screen === 'hub'`));
-await click('.level-tile.done');
-await wait(250);
-check('fase liberada abre preparação', await evaluate(visible('prep')));
-await click('[data-act=prep-back]');
-await wait(250);
-check('voltar da preparação retorna à central', await evaluate(`__summit.screen === 'hub'`));
+// mapa: salas visitadas aparecem; checkpoints ativados viram viagem rápida
+await evaluate(`(() => { const d = __summit.Save.data; d.world.flags['3:34.5,13'] = { level: 3, x: 34.5, y: 13 }; d.world.flags['1:20.5,2'] = { level: 1, x: 20.5, y: 2 }; __summit.hub.setTab('map'); })()`);
+await wait(300);
+check('mapa desenha as salas visitadas', (await count('#hub-panel .map-room.seen')) >= 7);
+check('mapa mostra os checkpoints', (await count('#hub-panel .map-pin.flag')) === 2 && (await count('#hub-panel .travel-row')) === 2);
+await shot('27b-mapa-com-checkpoints');
+await click('#hub-panel .travel-row[data-arg="3:34.5,13"]');
+await wait(1500);
+check('viagem rápida entra no checkpoint escolhido', await evaluate(`__summit.state === 'playing' && __summit.game.levelIndex === 3 && __summit.game.player.x === 34.5 && __summit.Save.data.checkpoint.level === 3`));
+await evaluate(`__summit.actions['to-hub']()`);
+await wait(400);
 
 await click('#hub-nav [data-arg=abilities]');
 await wait(200);
@@ -378,32 +419,31 @@ await shot('32-habilidade-evoluida');
 await click('#hub-nav [data-arg=home]');
 await wait(250);
 await click('#btn-continue');
-await wait(300);
-await shot('33-preparacao');
-check('preparação mostra 2/3', (await textOf('.slots-head b')) === '2/3');
-const owned = await evaluate(`[...document.querySelectorAll('#prep-grid .ab-card')].map(c => c.dataset.arg)`);
+await wait(1500);
+check('continuar volta ao último checkpoint', await evaluate(`__summit.state === 'playing' && __summit.game.levelIndex === 3`));
+await key('Tab');
+await wait(200);
+await shot('33-inventario');
+check('Tab abre o inventário com 2/3', (await textOf('#inv-panel .slots-head b')) === '2/3');
+const owned = await evaluate(`[...document.querySelectorAll('#inv-grid .ab-card')].map(c => c.dataset.arg)`);
 const free = owned.filter(id => !['shockwave', 'energy_shield'].includes(id));
-await click(`#prep-grid .ab-card[data-arg=${free[0]}]`);
+await click(`#inv-grid .ab-card[data-arg=${free[0]}]`);
 await wait(120);
-check('terceira habilidade entra', (await textOf('.slots-head b')) === '3/3');
-await click(`#prep-grid .ab-card[data-arg=${free[1]}]`);
+check('terceira habilidade entra', (await textOf('#inv-panel .slots-head b')) === '3/3');
+await click(`#inv-grid .ab-card[data-arg=${free[1]}]`);
 await wait(120);
-check('quarta é recusada com mensagem', (await textOf('.slots-head b')) === '3/3' && (await textOf('#prep-msg')).includes('ocupados'));
-await shot('34-preparacao-cheia');
-await click(`.slot.filled[data-arg=${free[0]}]`);
+check('quarta é recusada com mensagem', (await textOf('#inv-panel .slots-head b')) === '3/3' && (await textOf('#inv-msg')).includes('ocupados'));
+await shot('34-inventario-cheio');
+await click(`#inv-panel .slot.filled[data-arg=${free[0]}]`);
 await wait(120);
-await click(`#prep-grid .ab-card[data-arg=${free[1]}]`);
+await click(`#inv-grid .ab-card[data-arg=${free[1]}]`);
 await wait(120);
 check('substituição funciona', await evaluate(`__summit.Save.data.loadout.includes('${free[1]}') && !__summit.Save.data.loadout.includes('${free[0]}')`));
-await click('#btn-prep-clear');
+await click('#inv-panel .slot.filled[data-arg=energy_shield]');
 await wait(120);
-check('remover seleção esvazia', (await textOf('.slots-head b')) === '0/3');
-await click('#prep-grid .ab-card[data-arg=shockwave]');
-await click(`#prep-grid .ab-card[data-arg=${free[1]}]`);
-await wait(120);
-await click('#btn-prep-start');
-await wait(1500);
-check('fase carrega as habilidades escolhidas', await evaluate(`__summit.game.abilities.slots.map(s => s.id).join() === 'shockwave,${free[1]}'`));
+await key('Escape');
+await wait(200);
+check('fase usa as habilidades escolhidas sem recarregar', await evaluate(`__summit.state === 'playing' && __summit.game.abilities.slots.map(s => s.id).join() === 'shockwave,${free[1]}'`));
 check('nível evoluído chega ao gameplay', await evaluate(`__summit.game.abilities.byId.get('shockwave').stats.radius === 4.5`));
 await shot('35-fase-com-habilidades');
 
@@ -411,7 +451,7 @@ await evaluate(`(() => {
     const G = __summit.game;
     const P = G.player;
     G.abilities.effects.length = 0;
-    for (const id of ['energy_shield', 'blade_dash', 'summit_form', 'recall', 'time_dilation']) __summit.Save.data.abilities[id] = 1;
+    for (const id of ['energy_shield', 'blade_dash', 'riposte', 'recall', 'time_dilation']) __summit.Save.data.abilities[id] = 1;
     __summit.Save.data.loadout = ['energy_shield', 'recall', 'time_dilation'];
     G.load(G.levelIndex);
     G.hurtPlayer = () => {};
@@ -431,7 +471,7 @@ await evaluate(`(() => {
     const G = __summit.game;
     delete G.hurtPlayer;
     delete G.kill;
-    __summit.Save.data.loadout = ['summit_form', 'shockwave', 'blade_dash'];
+    __summit.Save.data.loadout = ['riposte', 'shockwave', 'blade_dash'];
     G.load(G.levelIndex);
     G.hurtPlayer = () => {};
     G.kill = () => {};
@@ -441,7 +481,7 @@ await key('KeyQ');
 await wait(40);
 await key('KeyE');
 await wait(90);
-await shot('35c-efeitos-forma-onda');
+await shot('35c-efeitos-guarda-onda');
 await evaluate(`(() => {
     const G = __summit.game;
     delete G.hurtPlayer;
@@ -523,9 +563,7 @@ check('Morte Súbita entra na central', await evaluate(`__summit.screen === 'hub
 await shot('38-central-morte-subita');
 check('slot novo não herda dados do outro', await evaluate(`__summit.Save.data.mode === 'permadeath' && __summit.Save.data.deaths === 0 && !__summit.Save.data.abilities.recall && __summit.Save.data.unlocked === 1`));
 await click('#btn-continue');
-await wait(200);
-await click('#btn-prep-start');
-await wait(800);
+await wait(1000);
 const slotBefore = await evaluate(`__summit.Save.active`);
 await evaluate(`__summit.game.kill('test')`);
 await key('KeyR');
@@ -560,12 +598,147 @@ for (const [w, h, label] of [[1920, 1080, 'fhd'], [1024, 640, 'pequena'], [760, 
     const overflow = await evaluate(`(() => { const b = document.getElementById('hub'); return b.scrollWidth - b.clientWidth; })()`);
     check(`central sem transbordo lateral em ${w}x${h}`, overflow <= 1, String(overflow));
     await evaluate(`__summit.hub.actions['hub-continue']()`);
+    await wait(900);
+    await key('Tab');
+    await wait(250);
+    await shot(`41-inventario-${label}`);
+    const invOverflow = await evaluate(`(() => { const b = document.querySelector('#pause .inv-shell'); return b.scrollWidth - b.clientWidth; })()`);
+    check(`inventário sem transbordo lateral em ${w}x${h}`, invOverflow <= 1, String(invOverflow));
+    await evaluate(`__summit.actions['to-hub']()`);
     await wait(300);
-    await shot(`41-preparacao-${label}`);
-    await evaluate(`__summit.actions['prep-back']()`);
-    await wait(150);
 }
 await send('Emulation.clearDeviceMetricsOverride');
+
+// Inferno: central do save muda de reino, sobrevive a recarregar e as fases/chefes do Capítulo 4 carregam
+await evaluate(`(() => {
+    const S = __summit;
+    const d = S.Save.data;
+    d.unlocked = 13; d.currentLevel = 12; d.checkpoint = null;
+    S.Save.syncRealm();
+    Object.assign(d.story.scenes, { intro: true, ch1to2: true, ch2to3: true, final: true, ch3to4: true });
+    d.skills = ['dash', 'wall_climb', 'double_jump', 'air_dash', 'ground_pound'];
+    S.Save.save();
+    S.hub.open('home');
+})()`);
+await wait(700);
+check('central troca para o Inferno', await evaluate(`document.getElementById('hub').dataset.realm === 'inferno' && getComputedStyle(document.querySelector('#hub .hub-embers')).display !== 'none'`));
+check('trilha da central mostra o reino', await evaluate(`document.querySelector('.trail-labels').textContent.includes('O Inferno')`));
+await shot('80-central-inferno');
+await click('#hub-nav [data-arg=map]');
+await wait(300);
+await shot('81-mapa-inferno');
+await click('#hub-nav [data-arg=achievements]');
+await wait(300);
+check('conquistas agrupadas', await evaluate(`document.querySelectorAll('.ach-group').length === 4`));
+await shot('82-conquistas-novas');
+await send('Page.reload');
+await wait(2500);
+check('central infernal persiste após recarregar', await evaluate(`__summit.Save.load(), __summit.Save.slot(0).realm === 'inferno'`));
+await evaluate(`(() => { __summit.Save.setActive(0); __summit.actions.resume && 0; })()`);
+for (const [level, x, y, label] of [[12, 30, 2, '83-portao-cinzas'], [13, 52, 10, '84-ponte-correntes'], [14, 36, 14, '85-salao-mentor']]) {
+    await evaluate(`(() => { const S = __summit; S.Save.setActive(0); S.actions.resume(); const G = S.game; G.load(${level}); S.view.setDim(1); G.running = true; G.hurtPlayer = () => {}; G.kill = () => {}; G.player.x = ${x}; G.player.y = ${y}; G.spawn = { x: ${x}, y: ${y} }; G.view.follow(${x}, ${y}, 0, true); })()`);
+    await wait(900);
+    check(`${label}: fase carrega e roda`, await evaluate(`__summit.state === 'playing' && __summit.game.level.chapter === 4 && Number.isFinite(__summit.game.player.x)`));
+    await shot(label);
+}
+for (const [level, label] of [[13, '86-besta'], [14, '87-mentor']]) {
+    await evaluate(`(() => { const G = __summit.game; G.load(${level}); G.hurtPlayer = () => {}; G.kill = () => {}; const a = G.level.arena; G.player.x = a.triggerX + 1; G.player.y = a.floor + 0.2; })()`);
+    for (let i = 0; i < 60 && !(await evaluate(`__summit.game.boss.mode === 'fight'`)); i++) await wait(250);
+    await wait(1500);
+    check(`${label}: luta ativa com barra`, await evaluate(`__summit.game.boss.mode === 'fight' && !document.getElementById('boss-bar').classList.contains('hidden')`));
+    await shot(label);
+    await evaluate(`(() => { const b = __summit.game.boss; while (b.mode === 'fight') { b.vulnerable = true; b.invuln = 0; b.damage(); } })()`);
+    await wait(3500);
+    check(`${label}: derrota abre a passagem`, await evaluate(`__summit.game.boss.mode === 'dead' && !__summit.game.goal.locked`));
+}
+
+// rig do protagonista: palma/dedos precisam acompanhar a mão em qualquer pose (antes ficavam presos no quadril)
+const rig = await evaluate(`import('./js/entities.js').then(E => {
+    const g = E.makePlayer();
+    const m = g.userData.model;
+    if (!m) return { ok: false, why: 'modelo não carregou' };
+    const hand = m.root.getObjectByName('DEF-handR_256');
+    const palm = m.root.getObjectByName('DEF-f_1_palm_4R_280');
+    const local = b => m.root.worldToLocal(b.getWorldPosition(b.position.clone()));
+    const gap = () => { g.updateMatrixWorld(true); return local(hand).distanceTo(local(palm)); };
+    E.animatePlayer(g, { x: 0, y: 0, vx: 0, vy: 0, facing: 1, onGround: true }, 'idle', 1, 0);
+    const rest = gap();
+    let worst = 0;
+    for (const pose of ['fall', 'jump', 'grab', 'pound', 'hurt', 'spin']) {
+        for (let i = 0; i < 30; i++) E.animatePlayer(g, { x: 0, y: 1, vx: 0, vy: 0, facing: 1, onGround: false }, pose, 1 / 30, i / 30);
+        worst = Math.max(worst, Math.abs(gap() - rest));
+    }
+    E.disposePlayer(g);
+    return { ok: worst < rest * 0.05 + 1e-3, why: 'desvio ' + worst.toFixed(4) + ' / repouso ' + rest.toFixed(4) };
+})`);
+check('rig: palma acompanha a mão em todas as poses', rig && rig.ok, rig && rig.why);
+
+// Regiões: passagens animadas, créditos que zeram o jogo e menu com identidade por lugar
+const realmOf = `document.getElementById('menu').dataset.realm`;
+const titleOf = `document.getElementById('menu-title').textContent`;
+const regionsHidden = `document.getElementById('btn-regions').classList.contains('hidden')`;
+await evaluate(`(() => {
+    const S = __summit;
+    S.Save.setActive(0);
+    const d = S.Save.data;
+    d.cleared = false; d.unlocked = 18; d.currentLevel = 17; d.checkpoint = null;
+    S.Save.syncRealm();
+    Object.assign(d.story.scenes, { intro: true, ch1to2: true, ch2to3: true, final: true, ch3to4: true, ch4to5: true });
+    delete d.story.scenes.ending;
+    d.best[17] = { time: 60, berries: 0 };
+    S.Save.save();
+    S.Save.setMenuRealm('ceu');
+    S.actions.menu();
+})()`);
+await wait(900);
+check('menu segue a região do save', await evaluate(`${realmOf} === 'ceu' && ${titleOf} === 'O ALÉM'`));
+check('Regiões oculto antes de zerar', await evaluate(regionsHidden));
+await evaluate(`__summit.actions.regions()`);
+check('Regiões não abre antes de zerar', await evaluate(`__summit.screen === 'menu'`));
+await shot('90-menu-ceu');
+for (const [scene, index, label] of [['ch3to4', 2, '91-passagem-inferno'], ['ch4to5', 1, '92-passagem-ceu-feixe'], ['ch4to5', 2, '93-passagem-ceu-nuvens'], ['ch4to5', 3, '94-chegada-ceu']]) {
+    await evaluate(`(() => { const S = __summit; S.Save.setActive(0); S.playScene('${scene}', () => S.actions.menu(), true); while (S.cinema.active.index < ${index}) S.cinema.nextShot(); })()`);
+    await wait(2600);
+    check(`${label}: cena toca`, await evaluate(`__summit.state === 'cinema' && __summit.cinema.active.id === '${scene}'`));
+    await shot(label);
+    await key('Escape');
+    await wait(500);
+}
+await evaluate(`(() => { const S = __summit; S.Save.setActive(0); S.playScene('ending', () => {}); })()`);
+await wait(900);
+check('final do jogo toca', await evaluate(`__summit.cinema.active.id === 'ending'`));
+await key('Escape');
+await wait(700);
+check('final abre os créditos', await evaluate(`__summit.state === 'ending' && !document.getElementById('ending').classList.contains('hidden')`));
+check('cena sozinha ainda não zera', await evaluate(`__summit.Save.data.cleared === false`));
+await wait(3000);
+await shot('95-creditos');
+await key('Escape');
+await wait(900);
+check('pular créditos zera e volta ao menu', await evaluate(`__summit.screen === 'menu' && __summit.Save.slot(0).cleared === true && __summit.Save.slot(0).story.scenes.ending === true`));
+check('Regiões liberado depois de zerar', await evaluate(`!${regionsHidden}`));
+await evaluate(`__summit.actions.regions()`);
+await wait(300);
+check('três regiões', await evaluate(`document.querySelectorAll('.region-card').length === 3 && __summit.screen === 'regions'`));
+await shot('96-regioes');
+for (const [id, title] of [['inferno', 'O FUNDO'], ['montanha', 'SUMMIT'], ['ceu', 'O ALÉM']]) {
+    if (await evaluate(`__summit.screen !== 'regions'`)) await evaluate(`__summit.actions.regions()`);
+    await click(`.region-card[data-arg=${id}]`);
+    await wait(1300);
+    check(`menu vira ${id}`, await evaluate(`__summit.screen === 'menu' && ${realmOf} === '${id}' && ${titleOf} === '${title}'`));
+    await shot(`97-menu-${id}`);
+}
+await evaluate(`__summit.actions.regions()`);
+await click('.region-card[data-arg=inferno]');
+await wait(1300);
+await send('Page.reload');
+await wait(3000);
+check('região do menu persiste após recarregar', await evaluate(`${realmOf} === 'inferno' && !${regionsHidden}`));
+await evaluate(`(() => { const S = __summit; S.actions.continue(); })()`);
+await wait(300);
+await evaluate(`__summit.actions.selectSave(0)`);
+await wait(900);
+check('save zerado abre na região escolhida', await evaluate(`__summit.Save.data.realm === 'inferno' && document.getElementById('hub').dataset.realm === 'inferno'`));
 
 check('sem erros no console', errors.length === 0, errors.slice(0, 6).join(' | '));
 console.log(`Capturas em: ${OUT}`);

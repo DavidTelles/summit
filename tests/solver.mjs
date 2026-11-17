@@ -1,5 +1,6 @@
 import { newGame, LEVELS } from './helpers.mjs';
 import { STEP } from '../js/config.js';
+import { doorById, roomIndex } from '../js/worldMap.js';
 
 const FRAMES = 8;
 const ACTIONS = [];
@@ -190,8 +191,56 @@ export function solveRoute(index, opts = {}) {
     return legs;
 }
 
-if (process.argv[1] && process.argv[1].endsWith('solver.mjs')) {
-    const filter = process.argv[2] ? process.argv[2].split(',').map(Number) : LEVELS.map((_, i) => i + 1);
+// Mundo aberto: trajetos das salas opcionais e das entradas delas, com pontos de passagem.
+// Cada trajeto: [rótulo, sala, [x, y] de partida (ou id de passagem: chegada dela), ...alvos (ou id de passagem: ela mesma)].
+const ALL_SKILLS = ['dash', 'wall_climb', 'double_jump', 'air_dash', 'ground_pound'];
+export function branchRoutes() {
+    const G = roomIndex('galeria'), F = roomIndex('fenda'), V = roomIndex('veio'), M = roomIndex('mirante');
+    return [
+        ['Galeria: chegada → saída', G, 'galeria-up', 'galeria-up'],
+        ['Galeria: chegada → sala secreta → saída', G, 'galeria-up', [49, 2], 'galeria-up'],
+        ['Fenda: oeste → leste', F, 'fenda-w', [31.5, 7], [43.5, 9], [49, 12], [58, 13], [67, 9], 'fenda-e'],
+        ['Fenda: leste → oeste', F, 'fenda-e', [67, 9], [58, 13], [49, 12], [43.5, 9], [31.5, 7], 'fenda-w'],
+        ['Templo → entrada da Fenda', 3, [34.5, 13], 'fenda-templo'],
+        ['Ruínas → entrada da Fenda', 6, [39.5, 27], 'fenda-ruinas'],
+        ['Veio: leste → oeste', V, 'veio-e', 'veio-w'],
+        ['Veio: oeste → leste', V, 'veio-w', 'veio-e'],
+        ['Portão → entrada do Veio', 12, [99.5, 2], 'veio-portao'],
+        ['Núcleo: chegada do Veio → saída', 10, 'veio-nucleo', 'out'],
+        ['Limiar → entrada do Mirante', 15, [102.5, 18], 'mirante-limiar'],
+        ['Mirante: topo → fundo', M, 'mirante-top', 'mirante-bottom'],
+        ['Cidade Antiga: saída da Galeria → fim', 1, 'galeria-hole', 'out']
+    ];
+}
+
+export function solveBranch([, room, start, ...stops]) {
+    const at = (p, arrive) => {
+        if (Array.isArray(p)) return { x: p[0], y: p[1] };
+        const d = doorById(room, p);
+        return arrive ? { x: d.spawn.x, y: d.spawn.y } : { x: d.x, y: d.y + 0.2 };
+    };
+    let from = at(start, true);
+    for (const stop of stops) {
+        const target = at(stop, false);
+        const r = solve(room, target, { from, skills: ALL_SKILLS, radius: 1.2, ms: 30000 });
+        if (!r.ok) return { ok: false, target, ...r };
+        from = target;
+    }
+    return { ok: true };
+}
+
+if (process.argv[1] && process.argv[1].endsWith('solver.mjs') && process.argv.includes('--branches')) {
+    let failed = 0;
+    for (const route of branchRoutes()) {
+        const r = solveBranch(route);
+        console.log(`${r.ok ? 'OK    ' : 'FALHOU'} ${route[0]}${r.ok ? '' : ` -> alvo (${r.target.x},${r.target.y}) perto=${r.bestD} em ${r.bestP}`}`);
+        if (!r.ok) failed++;
+    }
+    process.exit(failed ? 1 : 0);
+}
+
+if (process.argv[1] && process.argv[1].endsWith('solver.mjs') && !process.argv.includes('--branches')) {
+    const filter = process.argv[2] && !process.argv[2].startsWith('--') ? process.argv[2].split(',').map(Number) : LEVELS.map((_, i) => i + 1);
     const withBerries = process.argv.includes('--berries');
     let failed = 0;
     for (const n of filter) {
