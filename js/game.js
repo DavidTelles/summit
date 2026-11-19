@@ -14,8 +14,9 @@ import { createHazard, isHazardDef, overlap } from './hazards.js';
 import { createEnemy, isEnemyDef } from './enemies.js';
 import { createBoss } from './bossRoster.js';
 import { LEVEL_STORY, RECORDS, TOTAL_RECORDS, recordById, recordsFound } from './story.js';
-import { makeDecor, makeRecordStone } from './decor.js';
+import { animateMerchant, makeDecor, makeMerchant, makeRecordStone } from './decor.js';
 import { createAftermath } from './aftermath.js';
+import { MERCHANT_NAME, REWARDS, merchantIn } from './shop.js';
 
 // Tempo entre tocar uma passagem e a troca de sala (o véu escurece nesse intervalo).
 const COMPLETE_DELAY = 0.3;
@@ -218,6 +219,7 @@ export class Game {
         this.buildDoors();
         this.setupArena();
         this.buildStory();
+        this.buildMerchant();
         const origin = resume ? { x: resume.x, y: resume.y } : start;
         this.player = createPlayer(origin.x, origin.y);
         this.player.dashes = this.maxDashes();
@@ -351,6 +353,48 @@ export class Game {
         this.moments = story.moments.filter(m => !d || !d.story.moments[this.momentKey(m)]);
     }
 
+    // Mascate: um por reino, logo na entrada. ↑ perto dele abre a loja.
+    buildMerchant() {
+        const def = merchantIn(this.levelIndex);
+        if (this.merchant && this.merchant.near && this.hooks.onMerchantNear) this.hooks.onMerchantNear(false);
+        this.merchant = null;
+        if (!def) return;
+        const mesh = makeMerchant();
+        mesh.position.set(def.x, def.y, -0.25);
+        this.view.root.add(mesh);
+        this.merchant = { x: def.x, y: def.y, mesh, near: false };
+    }
+
+    updateMerchant(p, cx, cy) {
+        const m = this.merchant;
+        if (!m) return;
+        const near = !p.dead && !this.finished && overlap(cx, cy, PW, PH, m.x, m.y + 0.9, 2.6, 1.8);
+        if (near !== m.near) {
+            m.near = near;
+            if (this.hooks.onMerchantNear) this.hooks.onMerchantNear(near);
+            if (near && Save.sawMoment('merchant:intro')) {
+                this.storyLine('Ei, viajante! Cacos de Éter compram mapas, bússolas e pedras de viagem. Chegue perto e aperte ↑.', MERCHANT_NAME, 5);
+            }
+        }
+        if (!near || !p.onGround || this.inBossFight()) return;
+        if (this.input.hit('ArrowUp', 'KeyW') && this.hooks.onMerchant) {
+            p.vx = 0;
+            this.hooks.onMerchant();
+        }
+    }
+
+    inBossFight() {
+        const b = this.boss;
+        return !!(b && b.alive && b.mode !== 'idle' && b.mode !== 'dying');
+    }
+
+    // Cacos de Éter: a carteira da loja. O HUD pisca a cada ganho.
+    earnShards(n, x, y) {
+        if (!Save.earn(n)) return;
+        if (x !== undefined) this.view.emit(x, y, 0x9fe8ff, 6 + n, 4, 0.6);
+        if (this.hooks.onShards) this.hooks.onShards(n);
+    }
+
     momentKey(m) {
         return `${this.levelIndex}:${m.id}`;
     }
@@ -403,6 +447,7 @@ export class Game {
         stone.mesh.visible = false;
         this.view.emit(stone.x, stone.y, 0x6fcfff, 26, 5, 0.8);
         this.grantRecord(stone.id);
+        this.earnShards(REWARDS.record, stone.x, stone.y);
     }
 
     grantRecord(id) {
@@ -480,6 +525,7 @@ export class Game {
             maxDashes: this.maxDashes(),
             hp: p.hp,
             maxHp: PLAYER_HP,
+            shards: Save.data ? Save.data.shards : 0,
             abilities: this.abilities.hud(),
             slowmo: this.abilities.worldScale < 1
         });
@@ -705,6 +751,7 @@ export class Game {
             return;
         }
         this.updateStory(p, dt, cx, cy);
+        this.updateMerchant(p, cx, cy);
         for (const b of this.berries) {
             if (!b.got && overlap(cx, cy, PW, PH, b.x, b.y, 0.8, 0.8)) this.collectBerry(b);
         }
@@ -826,6 +873,7 @@ export class Game {
             if (d.berries >= 100) this.unlock('berry_100');
             this.syncProgress();
         }
+        this.earnShards(REWARDS.berry, b.x, b.y);
     }
 
     activateFlag(f, p) {
@@ -919,6 +967,7 @@ export class Game {
             if (d.stomps >= 100) this.unlock('stomp_100');
             this.syncProgress();
         }
+        this.earnShards(REWARDS.enemy, e.x, e.y + e.h / 2);
         this.abilities.onKill(kind, p);
         if (!p.onGround && ++this.airKills >= 3) this.unlock('air_chain');
         if (kind === 'stomp') {
@@ -1092,7 +1141,10 @@ export class Game {
         Sfx.win();
         Sfx.setTheme(this.level.chapter);
         this.hooks.onBossEnd && this.hooks.onBossEnd();
+        // O chefe paga cacos só na primeira vitória (a conquista marca isso).
+        const firstWin = Save.data && !Save.data.achievements[this.level.boss];
         this.unlock(this.level.boss);
+        if (firstWin) this.earnShards(REWARDS.boss, this.player.x, this.player.y + 1);
         if (!this.bossDamageTaken) this.unlock('boss_nodmg');
         const feat = this.boss.featEarned && this.boss.featEarned();
         if (feat) this.unlock(feat);
@@ -1230,6 +1282,7 @@ export class Game {
             r.mesh.position.y = r.y + Math.sin(t * 1.8) * 0.08;
             r.mesh.userData.halo.rotation.z = t;
         });
+        if (this.merchant) animateMerchant(this.merchant.mesh, t, this.player.x - this.merchant.x, this.merchant.near);
         this.springs.forEach(s => {
             s.anim = Math.max(0, s.anim - dt);
             s.mesh.userData.top.position.y = 0.4 + (s.anim > 0 ? 0.25 : 0);

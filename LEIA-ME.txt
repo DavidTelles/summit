@@ -14,6 +14,7 @@ CONTROLES (podem ser trocados em Configuracoes)
 Mover: setas ou A D | Pular: Espaco/C/Z | Dash: X/K/J + direcao
 Agarrar parede: Shift/V/L + cima/baixo | Voltar ao ultimo checkpoint: R
 Inventario: Esc/P (ultima aba), Tab/I (habilidades), M (mapa) | controle: Start
+Falar com o mascate: chegue perto e aperte Cima (seta ou W)
 Dentro do inventario: Q/E ou Tab (controle: LB/RB) trocam de aba; Esc, P ou I fecham.
 Pancada no chao (apos a fase 10): baixo + Pular no ar
 Habilidades equipadas: Q, E e F (controle: LB, RB e Y)
@@ -44,6 +45,22 @@ Pausa o jogo por cima da fase, com as abas Habilidades, Mapa, Som, Jogabilidade 
 Controles. A troca de habilidades vale na hora (inclusive em luta de chefe); recargas
 em andamento sao mantidas. No mapa, a viagem rapida so funciona descansando numa bandeira.
 Jogabilidade: dicas de controle de Oren, tremor de tela, acabamento da imagem, tela cheia.
+
+MASCATE E LOJA
+Bento, o Mascate, espera logo na entrada de cada reino: Base do Acampamento (Montanha),
+Portao de Cinzas (Inferno) e Limiar das Nuvens (Ceu). Chegue perto e aperte Cima para abrir a
+loja (o jogo pausa). O estoque e o mesmo nos tres lugares.
+Moeda: Cacos de Eter (aparecem no HUD). Inimigo derrotado +1, morango +3, registro +5 e
+chefe +30 (so na primeira vitoria). Os inimigos voltam quando voce sai e entra na sala.
+Itens:
+  Mapa do Cartografo (15)       - libera o desenho do mapa. Sem ele, a aba Mapa mostra so a
+                                  lista de checkpoints (a viagem pelas bandeiras continua).
+  Bussola (30)                  - mostra no mapa onde voce esta.
+  Pedra de Teletransporte (20)  - uma viagem rapida de qualquer lugar, sem checkpoint. Some ao
+                                  ser usada; carrega no maximo 3. Nao funciona em luta de chefe.
+  Amuleto do Coletor (60)       - o mapa mostra quantos morangos e registros faltam por sala.
+                                  Precisa do Mapa.
+Saves criados antes da loja ja vem com Mapa e Bussola.
 
 CENTRAL DA CAMPANHA
 Cada save abre a sua central: Inicio, Mapa, Habilidades, Registros, Conquistas,

@@ -136,7 +136,7 @@ test('saves isolados: registros, eventos e cenas de um save não aparecem em out
 test('migração v3 → v4: mantém progresso, não força cenas passadas e entrega registros obrigatórios já vividos', () => {
     const old = { version: 3, mode: 'permadeath', unlocked: 7, currentLevel: 6, deaths: 3, totalTime: 900, best: { 0: { time: 9, berries: 1 }, 3: { time: 9, berries: 0 }, 4: { time: 50, berries: 2 } }, achievements: { boss1: true }, completedChapters: [1], secrets: { '5:valley': true }, loadout: ['shockwave'], abilities: { shockwave: 2 } };
     const d = sanitizeSave(old);
-    assert.equal(d.version, 7);
+    assert.equal(d.version, 8);
     assert.equal(d.mode, 'permadeath');
     assert.equal(d.unlocked, 7);
     assert.equal(d.best[4].time, 50);

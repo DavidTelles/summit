@@ -5,6 +5,8 @@ import { abilityById } from './abilities.js';
 import { CHAPTER_NAMES, campaignProgress, continueLevel, continueRoom, levelFacts } from './campaign.js';
 import { ROOMS, isMain } from './worldMap.js';
 import { createInventory } from './inventory.js';
+import { createShop } from './shopUI.js';
+import { CURRENCY } from './shop.js';
 import { Sfx } from './audio.js';
 import { icon } from './icons.js';
 import { createHub, fmtLong, fmtTime as fmt } from './hub.js';
@@ -17,7 +19,7 @@ import { MENU_THEMES } from './menuThemes.js';
 import { REALMS, REALM_IDS, realmOfChapter } from './realms.js';
 
 const $ = id => document.getElementById(id);
-const screens = ['menu', 'pause', 'saves', 'skins', 'regions', 'mode', 'credits', 'death', 'options', 'hub'];
+const screens = ['menu', 'pause', 'saves', 'skins', 'regions', 'mode', 'credits', 'death', 'options', 'hub', 'shop'];
 const VEIL_MS = 240;
 const MUSIC_WIND = { 1: 0.03, 2: 0.09, 3: 0.05, 4: 0.07, 5: 0.06 };
 const BINDINGS = [
@@ -136,6 +138,7 @@ const game = new Game(view, {
         setHtml('hud-level', `<small>Cap. ${h.chapter}</small> ${h.level}`);
         setHtml('hud-berries', `${icon('berry', 'red')} ${h.berries}/${h.totalBerries}`);
         setHtml('hud-deaths', `${icon('skull')} ${h.deaths}`);
+        setHtml('hud-shards', `${icon(CURRENCY.icon, 'shard')} ${h.shards}`);
         $('hud-time').textContent = fmt(h.time);
         const stamina = Math.max(0, h.stamina);
         $('stamina').style.width = stamina * 100 + '%';
@@ -211,6 +214,20 @@ const game = new Game(view, {
     onHint(template, who) {
         if (Settings.hints !== false) showHint(template, who);
     },
+    // Mascate: aviso "↑ Conversar" ao chegar perto e loja ao apertar ↑.
+    onMerchantNear(near) {
+        $('merchant-prompt').innerHTML = `<kbd>↑</kbd> Conversar com o mascate`;
+        $('merchant-prompt').classList.toggle('hidden', !near);
+    },
+    onMerchant() {
+        openShop();
+    },
+    onShards() {
+        const el = $('hud-shards');
+        el.classList.remove('gain');
+        void el.offsetWidth;
+        el.classList.add('gain');
+    },
     onRecord(record) {
         toast('scroll', 'Registro encontrado', record.title);
     },
@@ -268,6 +285,21 @@ const inventory = createInventory({
     mountSettings: (host, inCampaign) => mountSettings(host, inCampaign),
     travelTo: flag => travelTo(flag)
 });
+
+const shop = createShop({
+    game,
+    toast,
+    show: name => show(name)
+});
+
+function openShop() {
+    state = 'paused';
+    game.flushPlaytime();
+    navStack = [];
+    $('merchant-prompt').classList.add('hidden');
+    shop.open();
+    Sfx.uiSelect();
+}
 
 function openInventory(tab) {
     state = 'paused';
@@ -901,6 +933,7 @@ const actions = {
         inventory.close();
         hideAll();
         state = 'playing';
+        if (game.merchant && game.merchant.near) $('merchant-prompt').classList.remove('hidden');
     },
     'to-checkpoint'() {
         toCheckpoint();
@@ -961,6 +994,8 @@ const actions = {
         enterHub();
     },
     ...hub.actions,
+    ...inventory.actions,
+    ...shop.actions,
     skins() {
         skinsSlot = Save.active;
         renderSkins();
@@ -1026,7 +1061,7 @@ function handleEscape() {
         return;
     }
     if (currentScreen === 'menu' || currentScreen === 'death') return;
-    if (currentScreen === 'pause') {
+    if (currentScreen === 'pause' || currentScreen === 'shop') {
         actions.resume();
         return;
     }
