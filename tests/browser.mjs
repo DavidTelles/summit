@@ -171,7 +171,7 @@ await wait(150);
 check('equipar no inventário vale na hora', await evaluate(`__summit.game.abilities.byId.has('energy_shield') && __summit.Save.data.loadout.includes('energy_shield')`));
 await key('KeyE');
 await wait(150);
-check('E troca para a aba do mapa', await evaluate(`!!document.querySelector('#inv-panel .map-canvas')`));
+check('E troca para a aba do mapa (sem mapa comprado: aviso do mascate)', await evaluate(`!!document.querySelector('#inv-panel .map-locked') && !document.querySelector('#inv-panel .map-canvas')`));
 await shot('06b-inventario-mapa');
 await key('KeyE');
 await wait(150);
@@ -188,6 +188,39 @@ check('I abre o inventário', await evaluate(`__summit.state === 'paused'`));
 await key('KeyI');
 await wait(150);
 check('I fecha o inventário', await evaluate(`__summit.state === 'playing'`));
+
+// mascate: aviso ao chegar perto, ↑ abre a loja, compras liberam mapa e bússola, pedra viaja de qualquer lugar
+await evaluate(`(() => { const G = __summit.game; G.player.x = 14.5; G.player.y = 2; G.player.vx = 0; })()`);
+await wait(400);
+check('bandeira da Base vira ponto de viagem', await evaluate(`Object.keys(__summit.Save.data.world.flags).length >= 1`));
+await evaluate(`(() => { const G = __summit.game; G.player.x = G.merchant.x + 0.6; G.player.y = 2; G.player.vx = 0; })()`);
+await wait(500);
+check('mascate na Base do Acampamento, aviso visível', await evaluate(`!!__summit.game.merchant && ${visible('merchant-prompt')}`));
+await shot('07a-mascate');
+await key('ArrowUp');
+await wait(400);
+check('↑ abre a loja e pausa', await evaluate(`__summit.screen === 'shop' && __summit.state === 'paused' && document.querySelectorAll('#shop-grid .shop-card').length === 4`));
+await evaluate(`(() => { const btn = document.querySelector('#shop-grid [data-arg=map]'); btn.click(); })()`);
+await wait(150);
+check('sem cacos não compra', await evaluate(`__summit.Save.data.items.map === false && /cacos/i.test(document.getElementById('shop-line').textContent)`));
+await evaluate(`__summit.Save.data.shards = 200`);
+for (const id of ['map', 'compass', 'warp_stone']) {
+    await evaluate(`document.querySelector('#shop-grid [data-arg=${id}]').click()`);
+    await wait(120);
+}
+check('compra mapa, bússola e pedra', await evaluate(`(() => { const d = __summit.Save.data; return d.items.map && d.items.compass && d.items.warp_stone === 1 && d.shards === 200 - 15 - 30 - 20 && document.getElementById('shop-shards').textContent === String(d.shards); })()`));
+await shot('07b-loja');
+await key('Escape');
+await wait(200);
+check('Esc fecha a loja e volta ao jogo', await evaluate(`__summit.state === 'playing' && __summit.screen === null`));
+await key('KeyM');
+await wait(250);
+check('com mapa e bússola, o mapa mostra a posição', await evaluate(`!!document.querySelector('#inv-panel .map-canvas') && !!document.querySelector('#inv-panel .map-pin.you')`));
+check('fora da bandeira, a pedra libera a viagem', await evaluate(`!!document.querySelector('#inv-panel .map-pin.flag:not([aria-disabled])')`));
+await shot('07c-mapa-comprado');
+await evaluate(`document.querySelector('#inv-panel .map-pin.flag').click()`);
+await wait(1500);
+check('pedra de teletransporte viaja e é gasta', await evaluate(`__summit.state === 'playing' && __summit.Save.data.items.warp_stone === 0 && Math.abs(__summit.game.player.x - 14.5) < 1`));
 
 // passagem: a saída da fase leva à próxima sala sem tela de resultado
 await evaluate(`(() => { const G = __summit.game; G.player.x = G.goal.x; G.player.y = G.goal.y + 0.1; })()`);
@@ -392,7 +425,8 @@ for (const [i, tab] of tabs.entries()) {
 await evaluate(`(() => { const d = __summit.Save.data; d.world.flags['3:34.5,13'] = { level: 3, x: 34.5, y: 13 }; d.world.flags['1:20.5,2'] = { level: 1, x: 20.5, y: 2 }; __summit.hub.setTab('map'); })()`);
 await wait(300);
 check('mapa desenha as salas visitadas', (await count('#hub-panel .map-room.seen')) >= 7);
-check('mapa mostra os checkpoints', (await count('#hub-panel .map-pin.flag')) === 2 && (await count('#hub-panel .travel-row')) === 2);
+const flagCount = await evaluate(`Object.keys(__summit.Save.data.world.flags).length`);
+check('mapa mostra os checkpoints', flagCount >= 2 && (await count('#hub-panel .map-pin.flag')) === flagCount && (await count('#hub-panel .travel-row')) === flagCount, `${flagCount} bandeiras`);
 await shot('27b-mapa-com-checkpoints');
 await click('#hub-panel .travel-row[data-arg="3:34.5,13"]');
 await wait(1500);

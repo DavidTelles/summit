@@ -5,7 +5,8 @@ import { REALMS, realmOfChapter } from './realms.js';
 import { icon } from './icons.js';
 import { Sfx } from './audio.js';
 import { abilityCard, abilityDetail, loadoutSlots } from './abilityUI.js';
-import { renderMap } from './mapView.js';
+import { noMapNote, renderMap, travelList } from './mapView.js';
+import { CURRENCY, hasItem, itemCount } from './shop.js';
 
 const $ = id => document.getElementById(id);
 
@@ -48,7 +49,8 @@ export function createInventory(ctx) {
         $('inv-room').textContent = level.name;
         $('inv-info').innerHTML = `<span title="Tempo nesta sala">${icon('clock')} ${fmt(g.time)}</span>
             <span title="Morangos desta sala">${icon('berry', 'red')} ${g.levelBerries}/${g.totalBerries}</span>
-            <span title="Mortes nesta sala">${icon('skull')} ${g.levelDeaths}</span>`;
+            <span title="Mortes nesta sala">${icon('skull')} ${g.levelDeaths}</span>
+            <span title="${CURRENCY.name}">${icon(CURRENCY.icon, 'shard')} ${Save.data ? Save.data.shards : 0}</span>`;
         $('inv-tabs').innerHTML = INV_TABS.map(t => `<button class="${t.id === ui.tab ? 'selected' : ''}" data-act="inv-tab" data-arg="${t.id}" aria-pressed="${t.id === ui.tab}">${icon(t.icon)}<span>${t.label}</span></button>`).join('');
     }
 
@@ -76,12 +78,29 @@ export function createInventory(ctx) {
             const d = Save.data;
             const g = ctx.game;
             const rest = restingFlag();
+            const stones = itemCount(d, 'warp_stone');
+            const warp = !rest && stones > 0 && !g.inBossFight();
+            const plural = stones === 1 ? 'pedra' : 'pedras';
             const note = rest
-                ? `${icon('flag')} Você está num checkpoint: escolha outro no mapa para viajar.`
-                : `${icon('lock')} A viagem rápida só funciona descansando num checkpoint.`;
+                ? `${icon('flag')} Você está num checkpoint: escolha outro para viajar.`
+                : warp
+                    ? `${icon('warp')} Pedra de Teletransporte: escolher um checkpoint gasta 1 (você tem ${stones} ${plural}).`
+                    : stones > 0
+                        ? `${icon('lock')} As pedras de teletransporte não funcionam durante a luta.`
+                        : `${icon('lock')} A viagem rápida só funciona descansando num checkpoint (ou com uma Pedra de Teletransporte).`;
+            const travel = !!rest || warp;
+            if (!hasItem(d, 'map')) {
+                const label = rest ? 'Viajar para cá' : warp ? 'Viajar (gasta 1 pedra)' : 'Descanse numa bandeira';
+                return `<div class="inv-map no-map">
+                    ${noMapNote()}
+                    <div class="travel-list inv-travel-list">${travelList(d, { act: 'inv-travel', here: rest, hereLabel: 'Você está aqui', hereDisabled: true, travel, label })}</div>
+                    <p class="map-legend">${note}</p>
+                </div>`;
+            }
+            const compass = hasItem(d, 'compass') ? '' : ` · ${icon('compass')} Sem bússola, sua posição não aparece.`;
             return `<div class="inv-map">
-                ${renderMap(d, { here: { room: g.levelIndex, x: g.player.x, y: g.player.y }, travel: !!rest, restKey: rest, act: 'inv-travel' })}
-                <p class="map-legend">${note}</p>
+                ${renderMap(d, { here: { room: g.levelIndex, x: g.player.x, y: g.player.y }, travel, restKey: rest, act: 'inv-travel' })}
+                <p class="map-legend">${note}${compass}</p>
             </div>`;
         },
         settings() {
@@ -178,12 +197,20 @@ export function createInventory(ctx) {
             const flag = Save.data.world.flags[btn.dataset.arg];
             if (!flag) return;
             const rest = restingFlag();
-            if (!rest) {
-                Sfx.denied();
-                ctx.toast('lock', 'Viagem indisponível', 'Descanse em um checkpoint para viajar pelo mapa.');
-                return;
-            }
             if (rest === btn.dataset.arg) return;
+            if (!rest) {
+                // Fora de um checkpoint, só com uma Pedra de Teletransporte (e nunca em luta de chefe).
+                const fighting = ctx.game.inBossFight();
+                if (fighting || !Save.useWarpStone()) {
+                    Sfx.denied();
+                    ctx.toast('lock', 'Viagem indisponível', fighting
+                        ? 'Não dá para fugir de um guardião.'
+                        : 'Descanse em um checkpoint ou use uma Pedra de Teletransporte.');
+                    return;
+                }
+                const left = itemCount(Save.data, 'warp_stone');
+                ctx.toast('warp', 'Pedra de Teletransporte usada', `${left} ${left === 1 ? 'restante' : 'restantes'}`);
+            }
             ctx.travelTo(flag);
         }
     };

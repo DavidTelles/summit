@@ -388,3 +388,65 @@ export function makeLightFigure() {
     g.userData = { material: m.material };
     return g;
 }
+
+// Bento, o Mascate: capuz, mochila cheia de quinquilharias, cajado com lanterna e um caco de éter no peito.
+// Origem nos pés; olha para o lado do jogador e respira devagar.
+export function makeMerchant() {
+    const g = new THREE.Group();
+    const glow = glowSprite(0xffc46b, 2.4, { opacity: 0.32, layer: LAYER.entity - 2 });
+    glow.position.set(0.62, 1.35, 0);
+    const pack = sprite('decor.merchantPack', 1.2, 2.2, ctx => {
+        shape(ctx, [[-0.42, 0.45, 1], [-0.5, 1.5, 1], [-0.3, 1.62, 1], [0.32, 1.6, 1], [0.38, 0.5, 1]], '#6b4a2f', 0.035);
+        shape(ctx, [[-0.4, 1.6], [-0.42, 1.86], [0, 1.95], [0.38, 1.86], [0.34, 1.58]], '#8a6b48', 0.03);
+        stroke(ctx, [[-0.2, 1.62], [-0.18, 1.9]], 0.018, INK);
+        stroke(ctx, [[0.14, 1.6], [0.16, 1.92]], 0.018, INK);
+        shape(ctx, [[-0.5, 0.9, 1], [-0.5, 1.22, 1], [-0.22, 1.22, 1], [-0.22, 0.9, 1]], '#4e3a28', 0.025);
+        shape(ctx, [[-0.56, 0.62], [-0.6, 0.82], [-0.48, 0.92], [-0.36, 0.82], [-0.4, 0.62]], '#7a8a92', 0.025);
+        stroke(ctx, [[0.05, 0.6], [0.3, 1.4]], 0.06, '#3a2a1c');
+        shape(ctx, [[0.08, 1.12], [0.06, 1.4], [0.24, 1.46], [0.3, 1.18]], '#5d7a53', 0.022);
+    }, { ay: 0, ppu: 100, layer: LAYER.entity + 1 });
+    pack.position.x = -0.38;
+    const body = sprite('decor.merchantBody', 1.4, 2, ctx => {
+        const robe = [[-0.44, 0, 1], [-0.38, 0.6], [-0.3, 1.1], [-0.3, 1.42], [-0.12, 1.72], [0.12, 1.74], [0.32, 1.46], [0.32, 1.1], [0.4, 0.6], [0.46, 0, 1]];
+        shape(ctx, robe, '#3e5a56', 0.04);
+        shape(ctx, [[-0.4, 0, 1], [-0.32, 0.3], [0.34, 0.3], [0.42, 0, 1]], '#2e4440', 0.03);
+        stroke(ctx, [[-0.06, 0.04], [-0.1, 0.9]], 0.02, 'rgba(0,0,0,0.45)');
+        stroke(ctx, [[0.16, 0.04], [0.14, 0.7]], 0.02, 'rgba(0,0,0,0.45)');
+        shape(ctx, [[-0.3, 0.86, 1], [-0.32, 0.96, 1], [0.34, 0.96, 1], [0.34, 0.86, 1]], '#7d5a34', 0.02);
+        shape(ctx, [[-0.2, 1.18], [-0.22, 1.46], [-0.04, 1.6], [0.16, 1.6], [0.26, 1.42], [0.22, 1.18]], '#0d1116', 0.025);
+        for (const x of [-0.06, 0.12]) {
+            ctx.fillStyle = '#ffe9a8';
+            ctx.beginPath();
+            ctx.arc(x, 1.36, 0.035, 0, Math.PI * 2);
+            ctx.fill();
+        }
+        shape(ctx, [[0.04, 0.98, 1], [0.12, 1.1, 1], [0.04, 1.2, 1], [-0.04, 1.1, 1]], AETHER, 0.018);
+        shape(ctx, [[0.3, 0.78], [0.3, 1.06], [0.46, 1.04], [0.48, 0.84]], '#3e5a56', 0.03);
+        stroke(ctx, [[0.56, 0.02], [0.6, 1.62]], 0.07, INK);
+        stroke(ctx, [[0.56, 0.02], [0.6, 1.62]], 0.04, '#6e5236');
+        stroke(ctx, [[0.6, 1.6], [0.72, 1.66]], 0.035, '#6e5236');
+        shape(ctx, [[0.38, 0.84], [0.4, 1.0], [0.58, 1.02], [0.6, 0.86]], '#c9a27a', 0.02);
+    }, { ay: 0, ppu: 100, layer: LAYER.entity + 2 });
+    const lamp = sprite('decor.merchantLantern', 0.5, 0.6, ctx => {
+        stroke(ctx, [[0, 0.3], [0, 0.18]], 0.02, INK);
+        shape(ctx, [[-0.12, 0.18, 1], [-0.14, -0.14, 1], [0.14, -0.14, 1], [0.12, 0.18, 1]], '#3a3020', 0.025);
+        shape(ctx, [[-0.08, 0.13, 1], [-0.09, -0.09, 1], [0.09, -0.09, 1], [0.08, 0.13, 1]], '#ffd27a', 0);
+        radial(ctx, 0, 0.02, 0.2, '#fff2c0', 0.8);
+    }, { ppu: 120, layer: LAYER.entity + 3, y: -0.3 });
+    const lantern = pivot(0.72, 1.64, lamp);
+    body.add(lantern);
+    g.add(glow, pack, body);
+    g.userData = { body, pack, lantern, glow };
+    return g;
+}
+
+export function animateMerchant(g, t, toPlayer, near) {
+    const u = g.userData;
+    const face = toPlayer < -0.2 ? -1 : 1;
+    g.scale.x += (face - g.scale.x) * 0.2;
+    const breathe = 1 + Math.sin(t * 2.1) * 0.025;
+    u.body.scale.y = breathe;
+    u.pack.scale.y = breathe;
+    u.lantern.rotation.z = Math.sin(t * 1.7) * 0.18;
+    u.glow.material.opacity = (near ? 0.5 : 0.3) + Math.sin(t * 6) * 0.04;
+}

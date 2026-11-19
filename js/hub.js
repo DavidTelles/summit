@@ -10,7 +10,8 @@ import { icon } from './icons.js';
 import { Sfx } from './audio.js';
 import { ACHIEVEMENT_GROUPS } from './achievements.js';
 import { abilityCard as card, abilityDetail as detail, loadoutSlots as slots } from './abilityUI.js';
-import { mapSummary, renderMap, travelPoints } from './mapView.js';
+import { mapSummary, noMapNote, renderMap, travelList } from './mapView.js';
+import { hasItem } from './shop.js';
 import { ROOMS } from './worldMap.js';
 import { CHAPTERS, REALMS, realmChapters, realmOfChapter } from './realms.js';
 
@@ -145,11 +146,14 @@ export function createHub(ctx) {
             const d = Save.data;
             const cp = d.checkpoint;
             const here = cp ? { room: cp.level, x: cp.x, y: cp.y } : null;
-            const points = travelPoints(d);
             const cpKey = cp ? `${cp.level}:${cp.x},${cp.y}` : null;
-            const list = points.length
-                ? points.map(p => `<button class="travel-row realm-${p.realm} ${p.key === cpKey ? 'here' : ''}" data-act="map-travel" data-arg="${p.key}">${icon('flag')}<span><b>${p.name}</b><small>${p.key === cpKey ? 'Último save' : 'Viajar para cá'}</small></span></button>`).join('')
-                : '<p class="empty-note">Toque nas bandeiras pelo caminho: cada uma salva o jogo e vira um ponto de viagem.</p>';
+            const list = travelList(d, { here: cpKey });
+            if (!hasItem(d, 'map')) {
+                return `<div class="map-layout">
+                    <div class="map-main">${noMapNote()}</div>
+                    <aside class="travel-list"><small class="kicker-soft">Viagem rápida</small>${list}</aside>
+                </div>`;
+            }
             const realms = mapSummary(d).map(r => `<span class="map-realm realm-${r.id}"><b>${r.seen}<i>/${r.total}</i></b><small>${r.name}</small></span>`).join('');
             return `<div class="map-layout">
                 <div class="map-main">

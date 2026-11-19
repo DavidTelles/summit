@@ -895,3 +895,48 @@ button.danger:hover, button.danger:focus-visible { background: #8a2a24; }
 .travel-row.realm-ceu .icon { color: #ffe0a0; }
 .travel-row.here { border-color: var(--gold); }
 @media (max-width: 900px) { .map-layout { grid-template-columns: 1fr; } .travel-list { max-height: none; } }
+
+/* ---------- Mascate e loja ---------- */
+#hud-shards { display: inline-flex; gap: 4px; align-items: center; }
+#hud-shards .icon, .inv-info .icon.shard { color: var(--blue); }
+#hud-shards.gain { animation: shardGain 0.6s ease-out; }
+@keyframes shardGain { 0% { transform: scale(1); color: #fff; } 30% { transform: scale(1.25); color: var(--blue); } 100% { transform: scale(1); } }
+#merchant-prompt {
+    position: fixed; left: 50%; bottom: 30vh; transform: translateX(-50%); z-index: 6; pointer-events: none;
+    padding: 7px 14px; border: 1px solid rgba(216, 199, 154, 0.45); background: rgba(8, 9, 14, 0.85); color: var(--ink);
+    font-size: 14px; font-style: italic; letter-spacing: 0.03em; animation: fade 0.2s ease-out;
+}
+#merchant-prompt kbd { font-family: inherit; font-style: normal; font-size: 12px; padding: 1px 7px; margin-right: 6px; border: 1px solid rgba(216, 199, 154, 0.5); color: var(--gold); background: rgba(0, 0, 0, 0.35); }
+#shop.inv { justify-content: center; padding: 3vh 2vw; background: rgba(5, 6, 10, 0.62); backdrop-filter: blur(2px); }
+.shop-shell { width: min(860px, 96vw); height: auto; max-height: 92vh; grid-template-rows: auto auto minmax(0, 1fr) auto; }
+.shop-line { margin: 0; padding: 10px 14px; border-left: 2px solid var(--gold); background: rgba(216, 199, 154, 0.07); color: #e9e1cb; font-style: italic; font-size: 15px; }
+.shop-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; min-height: 0; overflow-y: auto; scrollbar-width: thin; padding: 2px; }
+.shop-card { display: grid; grid-template-columns: 48px minmax(0, 1fr) auto; gap: 14px; align-items: center; text-align: left; padding: 10px 14px; }
+.shop-icon { position: relative; display: grid; place-items: center; width: 48px; height: 48px; border: 1px solid rgba(216, 199, 154, 0.35); background: rgba(0, 0, 0, 0.3); color: var(--gold); font-size: 24px; }
+.shop-count { position: absolute; right: -6px; bottom: -6px; font-style: normal; font-size: 11px; padding: 0 4px; background: #12130f; border: 1px solid rgba(216, 199, 154, 0.5); color: var(--ink); }
+.shop-text { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.shop-text b { font-weight: 400; font-size: 16.5px; color: #f3e9cf; }
+.shop-text small { color: var(--muted); font-size: 12.5px; line-height: 1.35; }
+.shop-price { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; font-size: 16px; color: var(--ink); white-space: nowrap; }
+.shop-price .icon { color: var(--blue); }
+.shop-price i { font-style: normal; font-size: 11.5px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--gold); }
+.shop-card.ready:hover .shop-icon, .shop-card.ready:focus-visible .shop-icon { border-color: var(--gold); color: #fff8e6; }
+.shop-card.owned { opacity: 0.72; }
+.shop-card.owned .shop-price, .shop-card.owned .shop-price .icon { color: var(--green); }
+.shop-card.blocked .shop-price i { color: #ff9a8a; }
+#shop-wallet b { font-weight: 400; font-size: 18px; color: var(--ink); }
+#shop-wallet .icon { color: var(--blue); }
+.map-locked { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 28px 20px; text-align: center; border: 1px dashed rgba(216, 199, 154, 0.3); background: rgba(6, 7, 11, 0.55); color: var(--muted); }
+.map-locked > .icon { font-size: 34px; color: var(--gold); opacity: 0.7; }
+.map-locked b { color: var(--ink); font-weight: 400; font-size: 18px; }
+.map-locked p { margin: 0; max-width: 460px; font-size: 13.5px; }
+.inv-travel-list { max-height: 34vh; }
+.travel-row[aria-disabled="true"] { opacity: 0.6; }
+.map-loot { position: absolute; transform: translate(-50%, -110%); display: inline-flex; gap: 8px; align-items: center; padding: 2px 8px; font-size: 13px; line-height: 1.2; color: var(--ink); background: rgba(8, 9, 14, 0.9); border: 1px solid rgba(216, 199, 154, 0.3); white-space: nowrap; pointer-events: auto; }
+.map-loot.done { color: var(--green); }
+@media (max-width: 620px) {
+    .shop-card { grid-template-columns: 40px minmax(0, 1fr); }
+    .shop-icon { width: 40px; height: 40px; font-size: 20px; }
+    .shop-price { grid-column: 2; flex-direction: row; align-items: center; justify-content: space-between; }
+}
+.shop-cost { display: inline-flex; gap: 5px; align-items: center; }

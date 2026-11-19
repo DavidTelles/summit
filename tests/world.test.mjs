@@ -207,7 +207,7 @@ test('lava do Núcleo fica parada depois que a fase foi vencida', () => {
 
 test('migração v6 → v7: salas abertas viram visitadas e Continuar usa o checkpoint', () => {
     const d = sanitizeSave({ version: 6, unlocked: 5, checkpoint: { level: 3, x: 10, y: 2, time: 4 } });
-    assert.equal(d.version, 7);
+    assert.equal(d.version, 8);
     for (let i = 0; i < 5; i++) assert.equal(d.world.visited[i], true);
     assert.deepEqual(d.world.flags, {});
     assert.deepEqual(continueRoom(d), { room: 3, resume: d.checkpoint });

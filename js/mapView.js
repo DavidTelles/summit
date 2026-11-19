@@ -2,6 +2,7 @@ import { ROOMS, ROOM_COUNT, MAP_BOUNDS, doorById, doorsOf, mapPoint, roomRect } 
 import { realmOfChapter, REALMS } from './realms.js';
 import { BOSSES } from './campaign.js';
 import { icon } from './icons.js';
+import { hasItem, remainingInRoom } from './shop.js';
 
 // Mapa do mundo aberto, no estilo dos mapas de Hollow Knight: só aparecem as salas visitadas
 // (e o contorno das vizinhas). Os checkpoints ativados viram botões de viagem rápida.
@@ -48,10 +49,12 @@ export function travelPoints(d) {
 }
 
 // opts.here: { room, x, y } posição atual; opts.travel: botões habilitados; opts.restKey: checkpoint onde o jogador está.
+// Sem a Bússola o mapa não mostra onde o jogador está; o Amuleto do Coletor conta o que falta.
 export function renderMap(d, opts = {}) {
     const { visited, known } = knownRooms(d);
     const B = viewBounds(known);
-    const here = opts.here || null;
+    const here = hasItem(d, 'compass') ? opts.here || null : null;
+    const collector = hasItem(d, 'collector');
     const rects = [];
     for (let i = 0; i < ROOM_COUNT; i++) {
         if (!known.has(i)) continue;
@@ -80,6 +83,13 @@ export function renderMap(d, opts = {}) {
     for (const i of visited) {
         const r = roomRect(i);
         pins.push(`<span class="map-label" style="left:${pct(r.x + r.w / 2 - B.x, B.w)};top:${pct(r.y + r.h - B.y, B.h)}">${ROOMS[i].name}</span>`);
+        if (!collector) continue;
+        const left = remainingInRoom(d, i);
+        const parts = [];
+        if (left.berries) parts.push(`${icon('berry', 'red')}${left.berries}`);
+        if (left.records) parts.push(`${icon('scroll')}${left.records}`);
+        const title = parts.length ? `Faltam ${left.berries} morango(s) e ${left.records} registro(s)` : 'Nada mais a coletar';
+        pins.push(`<span class="map-loot ${parts.length ? '' : 'done'}" style="left:${pct(r.x + r.w / 2 - B.x, B.w)};top:${pct(r.y - B.y, B.h)}" title="${title}">${parts.length ? parts.join(' ') : icon('check')}</span>`);
     }
     for (let i = 0; i < ROOM_COUNT; i++) {
         const boss = ROOMS[i].boss;
@@ -103,6 +113,23 @@ export function renderMap(d, opts = {}) {
         <svg viewBox="0 0 ${B.w.toFixed(2)} ${B.h.toFixed(2)}" preserveAspectRatio="none" aria-hidden="true">${links.join('')}${rects.join('')}</svg>
         ${pins.join('')}
     </div>`;
+}
+
+// Lista de checkpoints para viajar, usada também quando ainda não há Mapa.
+// opts.act: ação dos botões; opts.here: chave destacada; opts.travel === false: botões desabilitados.
+export function travelList(d, opts = {}) {
+    const points = travelPoints(d);
+    if (!points.length) return '<p class="empty-note">Toque nas bandeiras pelo caminho: cada uma salva o jogo e vira um ponto de viagem.</p>';
+    return points.map(p => {
+        const here = p.key === opts.here;
+        const off = opts.travel === false || (here && opts.hereDisabled);
+        return `<button class="travel-row realm-${p.realm} ${here ? 'here' : ''}" data-act="${opts.act || 'map-travel'}" data-arg="${p.key}" ${off ? 'aria-disabled="true"' : ''}>${icon('flag')}<span><b>${p.name}</b><small>${here ? opts.hereLabel || 'Último save' : opts.label || 'Viajar para cá'}</small></span></button>`;
+    }).join('');
+}
+
+// Painel mostrado no lugar do mapa enquanto o jogador não comprou o Mapa do Cartógrafo.
+export function noMapNote() {
+    return `<div class="map-locked">${icon('map')}<b>Você ainda não tem um mapa</b><p>Bento, o mascate, vende o Mapa do Cartógrafo. Ele espera na entrada de cada reino, começando pela Base do Acampamento.</p></div>`;
 }
 
 // Resumo textual do mapa: salas visitadas por reino.

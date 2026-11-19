@@ -6,6 +6,7 @@ import { CHAPTERS, CHAPTER_STARTS, REALM_IDS, chapterOfLevel, realmForProgress }
 import { ACHIEVEMENTS, achievementById, sanitizeAchievements } from './achievements.js';
 import { TOTAL_SECRETS } from './campaign.js';
 import { isRoom } from './worldMap.js';
+import { SHOP_ITEMS, applyPurchase, emptyItems, hasItem, itemCount } from './shop.js';
 
 export { ACHIEVEMENTS, chapterOfLevel };
 
@@ -107,7 +108,8 @@ export const SKILLS = [
 ];
 
 // v7: mundo aberto. Salas visitadas, checkpoints de viagem, coletas e paredes quebradas por sala.
-const SAVE_VERSION = 7;
+// v8: loja do mascate. Carteira de cacos e itens comprados (saves antigos ganham mapa e bússola).
+const SAVE_VERSION = 8;
 // Última fase que existia antes do Céu: quem já a venceu precisa ter a fase seguinte aberta.
 const LAST_LEVEL_V5 = 14;
 const SLOT_COUNT = 3;
@@ -180,6 +182,8 @@ export function sanitizeSave(raw) {
         berries: num(raw.berries),
         stomps: num(raw.stomps),
         crystals: num(raw.crystals),
+        shards: Math.floor(num(raw.shards)),
+        items: sanitizeItems(raw.items, version),
         best,
         achievements: sanitizeAchievements(raw.achievements),
         skills: [...skills],
@@ -198,6 +202,21 @@ export function sanitizeSave(raw) {
     data.skins = sanitizeSkins(raw.skins, data);
     data.story = sanitizeStory(raw.story, data, version);
     return data;
+}
+
+// Itens da loja. Quem já jogava antes da loja (v7 ou menos) tinha mapa e posição de graça: mantém.
+function sanitizeItems(raw, version) {
+    const r = obj(raw);
+    const items = emptyItems();
+    for (const item of SHOP_ITEMS) {
+        if (item.kind === 'stack') items[item.id] = Math.min(item.max, Math.floor(num(r[item.id])));
+        else items[item.id] = r[item.id] === true;
+    }
+    if (version < 8) {
+        items.map = true;
+        items.compass = true;
+    }
+    return items;
 }
 
 // Chaves de coleta e de paredes: "sala:x,y". Salas abaixo do progresso contam como visitadas.
@@ -283,6 +302,37 @@ export const Save = {
         const d = this.data;
         if (!d || d.story.records[id]) return false;
         d.story.records[id] = true;
+        this.save();
+        return true;
+    },
+    // Loja: ganha cacos, compra e gasta pedras de teletransporte.
+    earn(n) {
+        const d = this.data;
+        if (!d || !(n > 0)) return 0;
+        d.shards += n;
+        this.save();
+        return n;
+    },
+    hasItem(id) {
+        const d = this.data;
+        return !!d && hasItem(d, id);
+    },
+    itemCount(id) {
+        const d = this.data;
+        return d ? itemCount(d, id) : 0;
+    },
+    // Devolve null se comprou, ou o motivo da recusa.
+    buy(id) {
+        const d = this.data;
+        if (!d) return 'Nenhum save ativo.';
+        const error = applyPurchase(d, id);
+        if (!error) this.save();
+        return error;
+    },
+    useWarpStone() {
+        const d = this.data;
+        if (!d || itemCount(d, 'warp_stone') <= 0) return false;
+        d.items.warp_stone--;
         this.save();
         return true;
     },

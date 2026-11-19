@@ -26,11 +26,13 @@
         <div id="hud-level"></div>
         <div class="hud-row">
             <span id="hud-berries"></span>
+            <span id="hud-shards" title="Cacos de Éter"></span>
             <span id="hud-deaths"></span>
             <span id="hud-time">00:00.0</span>
         </div>
         <div id="hud-skills"></div>
     </div>
+    <div id="merchant-prompt" class="hidden" role="status"></div>
 </div>
 
 <div id="hud-abilities" class="hidden" aria-label="Habilidades equipadas"></div>
@@ -141,6 +143,22 @@
             <button class="btn" data-act="to-checkpoint">Voltar ao checkpoint</button>
             <button class="btn" data-act="to-hub">Sair para a central</button>
             <button class="btn btn-primary" data-act="resume">Continuar</button>
+        </footer>
+    </div>
+</div>
+
+<div id="shop" class="screen hidden inv">
+    <div class="inv-shell shop-shell" role="dialog" aria-label="Loja do mascate">
+        <header class="inv-top">
+            <div class="inv-where"><small id="shop-kicker">Loja</small><b id="shop-name"></b></div>
+            <div id="shop-wallet" class="inv-info"></div>
+        </header>
+        <p id="shop-line" class="shop-line" role="status"></p>
+        <section id="shop-grid" class="shop-grid"></section>
+        <footer class="inv-foot">
+            <span class="inv-hint" id="shop-hint"></span>
+            <span class="spacer"></span>
+            <button class="btn btn-primary" data-act="resume">Voltar à jornada</button>
         </footer>
     </div>
 </div>
